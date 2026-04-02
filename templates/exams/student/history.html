@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block title %}My History — Exam Platform{% endblock %}
+{% block page_title %}My Exam History{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-title" style="margin-bottom: 24px;">📜 Past Exam Attempts</div>
+    
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Date Attempted</th>
+                    <th>Completion Status</th>
+                    <th>Score</th>
+                    <th>Result</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for res in results %}
+                <tr>
+                    <td style="font-weight: 700;">{{ res.exam_paper.category.name }}</td>
+                    <td style="font-size: 13px;">{{ res.submitted_at|date:"M d, Y H:i" }}</td>
+                    <td>
+                        <span class="badge badge-evaluated">Completed</span>
+                    </td>
+                    <td>
+                        <!-- Students only see percentage/status per spec, but we can show Marks Obtained if evaluated -->
+                        {% if res.status == 'Evaluated' %}
+                            {{ res.total_marks_obtained|floatformat:0 }} / {{ res.total_marks_possible }}
+                        {% else %}
+                            Pending Review
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if res.status == 'Evaluated' %}
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <span class="badge {% if res.is_passed %}badge-approved{% else %}badge-rejected{% endif %}" style="font-weight: 700;">
+                                    {{ res.percentage }}%
+                                </span>
+                                {% if not res.is_passed %}
+                                    <form action="{% url 'request_exam' %}" method="POST">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="category" value="{{ res.exam_paper.category.id }}">
+                                        <button type="submit" class="btn btn-primary btn-sm" style="font-size: 11px; padding: 4px 8px;">Request Retest</button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        {% else %}
+                            <span class="badge badge-submitted">Submitted</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 48px;">
+                        No past exams found. Start an exam from your dashboard!
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

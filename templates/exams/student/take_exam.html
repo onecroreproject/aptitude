@@ -1,0 +1,188 @@
+{% extends 'base.html' %}
+{% block title %}Exam — Exam Platform{% endblock %}
+
+{% block content %}
+<div style="min-height: calc(100vh - 100px); background:var(--bg-primary);">
+    <!-- Exam Header -->
+    <div class="exam-header" style="margin:16px; position:sticky; top:0; z-index:100; display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: var(--bg-secondary); border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid var(--border-color);">
+        <div>
+            <h2 style="font-size:18px; font-weight:700; margin: 0;">📝 {{ paper.category.name }} Exam</h2>
+            <p style="color:var(--text-secondary); font-size:13px; margin: 4px 0 0;">
+                Question <span id="current-q-num">1</span> of {{ questions|length }}
+            </p>
+        </div>
+        <div style="text-align: right;">
+            <div id="q-timer-container" style="font-size: 24px; font-weight: 700; font-family: monospace; color: var(--accent-primary);">
+                00:00
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Question Timer</div>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="messages-container" style="padding: 0 16px;">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Questions Form -->
+    <form method="post" id="exam-form" style="padding:0 16px 100px;">
+        {% csrf_token %}
+
+        {% for pq in questions %}
+        <div class="question-card fade-in" id="q-card-{{ forloop.counter0 }}" style="display: {% if forloop.first %}block{% else %}none{% endif %};">
+            <div class="question-meta" style="margin-bottom: 20px; display: flex; gap: 12px; align-items: center;">
+                <span class="badge badge-info">📊 {{ pq.question.marks }} marks</span>
+                <span class="badge badge-warning">⏱️ {{ pq.question.time_limit_minutes }} min limit</span>
+                <span class="difficulty-badge {% if pq.question.difficulty == 'Easy' %}easy{% elif pq.question.difficulty == 'Medium' %}medium{% else %}hard{% endif %}">
+                    {{ pq.question.difficulty }}
+                </span>
+            </div>
+            
+            <div class="question-text" style="font-size: 1.25rem; font-weight: 600; line-height: 1.6; color: var(--text-primary); margin-bottom: 24px;">
+                {{ pq.question.question_text }}
+            </div>
+
+            {% if pq.question.question_type == 'MCQ' or pq.question.question_type == 'True/False' %}
+            <div class="options-list" style="display: grid; gap: 12px;">
+                {% if pq.question.option_a %}
+                <label class="option-item">
+                    <input type="radio" name="answer_{{ pq.question.id }}" value="A">
+                    <span><strong>A.</strong> {{ pq.question.option_a }}</span>
+                </label>
+                {% endif %}
+                {% if pq.question.option_b %}
+                <label class="option-item">
+                    <input type="radio" name="answer_{{ pq.question.id }}" value="B">
+                    <span><strong>B.</strong> {{ pq.question.option_b }}</span>
+                </label>
+                {% endif %}
+                {% if pq.question.option_c %}
+                <label class="option-item">
+                    <input type="radio" name="answer_{{ pq.question.id }}" value="C">
+                    <span><strong>C.</strong> {{ pq.question.option_c }}</span>
+                </label>
+                {% endif %}
+                {% if pq.question.option_d %}
+                <label class="option-item">
+                    <input type="radio" name="answer_{{ pq.question.id }}" value="D">
+                    <span><strong>D.</strong> {{ pq.question.option_d }}</span>
+                </label>
+                {% endif %}
+            </div>
+            {% elif pq.question.question_type == 'Short Answer' %}
+            <div class="form-group">
+                <input type="text" name="answer_{{ pq.question.id }}" class="form-input" placeholder="Type your answer here..." maxlength="500" style="width: 100%; padding: 16px; border-radius: 12px; border: 2px solid var(--border-color); background: var(--bg-secondary);">
+            </div>
+            {% elif pq.question.question_type == 'Essay' %}
+            <div class="form-group">
+                <textarea name="answer_{{ pq.question.id }}" class="form-input" rows="8" placeholder="Write your detailed answer here..." style="width: 100%; padding: 16px; border-radius: 12px; border: 2px solid var(--border-color); background: var(--bg-secondary);"></textarea>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        <!-- Navigation Buttons (sticky bottom) -->
+        <div style="position:fixed; bottom:0; left:0; right:0; padding:16px 20px; background:var(--bg-secondary); border-top:1px solid var(--border-color); z-index:100; display:flex; justify-content:space-between; align-items:center;">
+            <div style="color:var(--text-secondary); font-size:14px;">
+                <span id="progress-text">Progress: 1 / {{ questions|length }}</span>
+            </div>
+            <div>
+                <button type="button" class="btn btn-primary" id="next-btn" style="padding: 10px 24px; font-weight: 600;">Next Question ➡</button>
+                <button type="submit" class="btn btn-success" id="submit-btn" style="display: none; padding: 10px 24px; font-weight: 600;" onclick="return confirm('Are you sure you want to submit your exam?')">Submit Final Paper ✅</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+{% block extra_js %}
+<script>
+    const questions = [
+        {% for pq in questions %}
+        {
+            id: "{{ pq.question.id }}",
+            timeLimit: {{ pq.question.time_limit_minutes }} * 60
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    let currentIdx = 0;
+    let timerInterval = null;
+    let secondsRemaining = questions[0].timeLimit;
+
+    const timerEl = document.getElementById('q-timer-container');
+    const qNumEl = document.getElementById('current-q-num');
+    const progressEl = document.getElementById('progress-text');
+    const nextBtn = document.getElementById('next-btn');
+    const submitBtn = document.getElementById('submit-btn');
+    const form = document.getElementById('exam-form');
+
+    function updateTimerDisplay() {
+        const mins = Math.floor(secondsRemaining / 60);
+        const secs = secondsRemaining % 60;
+        timerEl.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        
+        if (secondsRemaining <= 10) {
+            timerEl.style.color = 'var(--accent-danger)';
+        } else if (secondsRemaining <= 30) {
+            timerEl.style.color = 'var(--accent-warning)';
+        } else {
+            timerEl.style.color = 'var(--accent-primary)';
+        }
+    }
+
+    function startTimer() {
+        clearInterval(timerInterval);
+        secondsRemaining = questions[currentIdx].timeLimit;
+        updateTimerDisplay();
+        
+        timerInterval = setInterval(() => {
+            secondsRemaining--;
+            updateTimerDisplay();
+            
+            if (secondsRemaining <= 0) {
+                clearInterval(timerInterval);
+                moveToNext();
+            }
+        }, 1000);
+    }
+
+    function moveToNext() {
+        // Hide current
+        document.getElementById(`q-card-${currentIdx}`).style.display = 'none';
+        
+        currentIdx++;
+        
+        if (currentIdx < questions.length) {
+            // Show next
+            document.getElementById(`q-card-${currentIdx}`).style.display = 'block';
+            qNumEl.textContent = currentIdx + 1;
+            progressEl.textContent = `Progress: ${currentIdx + 1} / ${questions.length}`;
+            
+            if (currentIdx === questions.length - 1) {
+                nextBtn.style.display = 'none';
+                submitBtn.style.display = 'block';
+            }
+            
+            startTimer();
+        } else {
+            // Auto submit if no more questions
+            form.submit();
+        }
+    }
+
+    nextBtn.addEventListener('click', moveToNext);
+
+    // Initial start
+    if (questions.length > 0) {
+        if (questions.length === 1) {
+            nextBtn.style.display = 'none';
+            submitBtn.style.display = 'block';
+        }
+        startTimer();
+    }
+</script>
+{% endblock %}
+{% endblock %}

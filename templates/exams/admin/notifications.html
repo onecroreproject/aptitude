@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block title %}Notifications — Admin{% endblock %}
+
+{% block body %}
+<div class="dashboard-layout">
+    <div class="sidebar-overlay"></div>
+    <aside class="sidebar">
+        <div class="sidebar-header"><div class="brand"><span class="brand-icon">⚡</span><span class="brand-text">Admin Panel</span></div></div>
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-section-title">Overview</div>
+                <a href="{% url 'admin_dashboard' %}" class="nav-link"><span class="nav-icon">📊</span> Dashboard</a>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">Management</div>
+                <a href="{% url 'admin_students' %}" class="nav-link"><span class="nav-icon">👥</span> Students</a>
+                <a href="{% url 'admin_questions' %}" class="nav-link"><span class="nav-icon">❓</span> Questions</a>
+                <a href="{% url 'admin_exam_requests' %}" class="nav-link"><span class="nav-icon">📋</span> Requests</a>
+                <a href="{% url 'admin_results' %}" class="nav-link"><span class="nav-icon">📈</span> Results</a>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">Tools</div>
+                <a href="{% url 'admin_notifications' %}" class="nav-link active"><span class="nav-icon">🔔</span> Notifications
+                    {% if unread_count %}<span class="badge">{{ unread_count }}</span>{% endif %}
+                </a>
+            </div>
+        </nav>
+        <div class="sidebar-footer"><a href="{% url 'logout' %}" class="nav-link"><span class="nav-icon">🚪</span> Logout</a></div>
+    </aside>
+
+    <main class="main-content">
+        <header class="top-bar">
+            <div class="top-bar-left">
+                <button class="hamburger" onclick="toggleSidebar()">☰</button>
+                <h2>Notifications</h2>
+            </div>
+            <div class="top-bar-right">
+                {% if unread_count > 0 %}
+                <form method="post" action="{% url 'mark_all_read' %}">{% csrf_token %}
+                    <button type="submit" class="btn btn-ghost btn-sm">Mark All Read</button>
+                </form>
+                {% endif %}
+            </div>
+        </header>
+
+        <div class="content-area">
+            <div class="card">
+                <div class="card-body" style="padding:0;">
+                    {% if notifications %}
+                        {% for n in notifications %}
+                        <div class="notification-item {% if not n.is_read %}unread{% endif %}" data-notif="{{ n.id }}" onclick="markRead('{{ n.id }}','{{ csrf_token }}')">
+                            <div class="notification-icon {% if n.notification_type == 'Approval' %}approval{% elif n.notification_type == 'Rejection' %}rejection{% else %}info{% endif %}">
+                                {% if n.notification_type == 'Approval' %}✅{% elif n.notification_type == 'Rejection' %}❌{% else %}ℹ️{% endif %}
+                            </div>
+                            <div class="notification-content">
+                                <h4>{{ n.title }}</h4>
+                                <p>{{ n.message }}</p>
+                                <div class="notification-time">{{ n.created_at|timesince }} ago</div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                    <div class="empty-state"><div class="empty-icon">🔕</div><h3>No notifications</h3></div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if is_paginated %}
+            <div class="pagination-wrapper">
+                {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}">← Prev</a>{% endif %}
+                <span class="current">{{ page_obj.number }}/{{ page_obj.paginator.num_pages }}</span>
+                {% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}">Next →</a>{% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </main>
+</div>
+{% endblock %}

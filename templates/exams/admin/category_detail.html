@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ category.name }} - Questions{% endblock %}
+{% block page_title %}{{ category.name }} Questions{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 24px;">
+  <a href="{% url 'admin_categories' %}" style="text-decoration: none; color: var(--text-secondary); font-size: 14px; display: flex; align-items: center; gap: 4px;">
+    ← Back to Categories
+  </a>
+</div>
+
+<div class="card">
+  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+    <div>
+      <div class="card-title" style="margin-bottom: 4px;">{{ category.name }} Management</div>
+      <p style="font-size: 14px; color: var(--text-secondary);">Manage questions specifically for this subject.</p>
+    </div>
+    
+    <div style="display: flex; gap: 12px;">
+      <a href="{% url 'admin_import_questions_to_category' category.id %}" class="btn btn-outline" style="border-color: var(--accent-primary); color: var(--accent-primary);">
+        📥 Bulk Upload (Excel)
+      </a>
+      <a href="{% url 'admin_add_question_to_category' category.id %}" class="btn btn-primary">
+        + Add Question Manually
+      </a>
+    </div>
+  </div>
+
+  <!-- Search Filter -->
+  <form method="GET" style="margin-bottom: 24px; display: flex; gap: 12px;">
+    <input type="text" name="search" value="{{ search }}" placeholder="Search questions..." class="form-input" style="max-width: 400px; flex: 1;">
+    <button type="submit" class="btn btn-secondary">Search</button>
+  </form>
+  
+  <div class="table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Question Text</th>
+          <th>Type</th>
+          <th>Difficulty</th>
+          <th>Marks</th>
+          <th>Time Limit</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for question in questions %}
+          <tr>
+            <td style="max-width: 400px;">
+              <div style="font-weight: 500; color: var(--text-primary);">
+                {{ question.question_text|truncatechars:100 }}
+              </div>
+            </td>
+            <td><span class="badge badge-info">{{ question.get_question_type_display }}</span></td>
+            <td>
+              <span class="difficulty-badge {% if question.difficulty == 'Easy' %}easy{% elif question.difficulty == 'Medium' %}medium{% else %}hard{% endif %}">
+                {{ question.difficulty }}
+              </span>
+            </td>
+            <td style="font-weight: 700;">{{ question.marks }} pts</td>
+            <td>{{ question.time_limit_minutes }} min</td>
+            <td>
+              <div style="display: flex; gap: 8px;">
+                <a href="{% url 'admin_view_question' question.pk %}" class="btn btn-outline btn-sm">View</a>
+                <a href="{% url 'admin_edit_question' question.pk %}" class="btn btn-outline btn-sm">Edit</a>
+                <form action="{% url 'admin_delete_question' question.pk %}" method="POST" onsubmit="return confirm('Remove this question?');">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-outline btn-sm" style="color: var(--accent-danger); border-color: var(--accent-danger);">Delete</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 48px;">
+              No questions found for this category.
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if is_paginated %}
+    <div style="margin-top: 24px; display: flex; justify-content: center; gap: 8px;">
+      {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}" class="btn btn-outline btn-sm">Previous</a>
+      {% endif %}
+      <span style="padding: 4px 12px; font-weight: 600;">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}" class="btn btn-outline btn-sm">Next</a>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

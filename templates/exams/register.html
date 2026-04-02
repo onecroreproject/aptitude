@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Create Account - ExamPlatform{% endblock %}
+{% block page_title %}Student Registration{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+
+{% block content %}
+<div class="auth-card">
+  <div style="text-align: center; margin-bottom: 32px;">
+    <div style="font-size: 32px; margin-bottom: 12px;">🎓</div>
+    <h1 style="font-size: 24px; font-weight: 800; color: var(--text-primary);">Create Student Account</h1>
+    <p style="color: var(--text-muted); font-size: 14px;">Register to take personalized exams and track your results.</p>
+  </div>
+  
+  <form method="POST" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="form-group">
+      <label class="label">Username</label>
+      {{ form.username }}
+      {% if form.username.errors %}<div style="color: var(--accent-danger); font-size: 11px;">{{ form.username.errors.0 }}</div>{% endif %}
+    </div>
+
+    <div class="grid-2">
+      <div class="form-group">
+        <label class="label">First Name</label>
+        {{ form.first_name }}
+        {% if form.first_name.errors %}<div style="color: var(--accent-danger); font-size: 11px;">{{ form.first_name.errors.0 }}</div>{% endif %}
+      </div>
+      <div class="form-group">
+        <label class="label">Last Name</label>
+        {{ form.last_name }}
+        {% if form.last_name.errors %}<div style="color: var(--accent-danger); font-size: 11px;">{{ form.last_name.errors.0 }}</div>{% endif %}
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="label">Email Address</label>
+      {{ form.email }}
+      {% if form.email.errors %}<div style="color: var(--accent-danger); font-size: 11px;">{{ form.email.errors.0 }}</div>{% endif %}
+    </div>
+
+    <div class="form-group">
+      <label class="label">Institution / College</label>
+      {{ form.institution }}
+      {% if form.institution.errors %}<div style="color: var(--accent-danger); font-size: 11px;">{{ form.institution.errors.0 }}</div>{% endif %}
+    </div>
+
+    <div class="grid-2">
+      <div class="form-group">
+        <label class="label">Phone Number</label>
+        {{ form.phone_number }}
+        {% if form.phone_number.errors %}<div style="color: var(--accent-danger); font-size: 11px;">{{ form.phone_number.errors.0 }}</div>{% endif %}
+      </div>
+      <div class="form-group">
+        <label class="label">WhatsApp Number</label>
+        {{ form.whatsapp_number }}
+        {% if form.whatsapp_number.errors %}<div style="color: var(--accent-danger); font-size: 11px;">{{ form.whatsapp_number.errors.0 }}</div>{% endif %}
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="form-group">
+        <label class="label">Password</label>
+        {{ form.password1 }}
+        {% if form.password1.errors %}<div style="color: var(--accent-danger); font-size: 11px;">{{ form.password1.errors.0 }}</div>{% endif %}
+      </div>
+      <div class="form-group">
+        <label class="label">Confirm Password</label>
+        {{ form.password2 }}
+        {% if form.password2.errors %}<div style="color: var(--accent-danger); font-size: 11px;">{{ form.password2.errors.0 }}</div>{% endif %}
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary" style="width: 100%; height: 48px; font-size: 16px; margin-top: 16px;">
+      Create Account
+    </button>
+  </form>
+  
+  <div style="text-align: center; margin-top: 32px; font-size: 14px; color: var(--text-secondary);">
+    Already registered? <a href="{% url 'login' %}" style="font-weight: 700; color: var(--accent-primary);">Sign In</a>
+  </div>
+</div>
+{% endblock %}

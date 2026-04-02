@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Bulk Import - Admin Dashboard{% endblock %}
+{% block page_title %}Bulk Question Import{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 24px;">
+    {% if category %}
+        <a href="{% url 'admin_category_detail' category.id %}" style="text-decoration: none; color: var(--text-secondary); font-size: 14px; display: flex; align-items: center; gap: 4px;">
+            ← Back to {{ category.name }}
+        </a>
+    {% else %}
+        <a href="{% url 'admin_questions' %}" style="text-decoration: none; color: var(--text-secondary); font-size: 14px; display: flex; align-items: center; gap: 4px;">
+            ← Back to Question Bank
+        </a>
+    {% endif %}
+</div>
+
+{% if category %}
+    <div class="alert alert-info" style="margin-bottom: 24px;">
+        ℹ️ You are importing questions specifically for the <strong>{{ category.name }}</strong> category. 
+        Any category column in the Excel will be ignored.
+    </div>
+{% endif %}
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px;">
+  
+  <!-- Import Upload Section -->
+  <div class="card">
+    <div class="card-title">Upload Excel File</div>
+    <p style="color: var(--text-secondary); margin-bottom: 24px; font-size: 14px;">
+      Quickly import multiple questions using our Excel template. 
+      {% if not category %}All categories mentioned in the sheet will be automatically resolved.{% endif %}
+    </p>
+    
+    <form method="POST" enctype="multipart/form-data">
+      {% csrf_token %}
+      
+      <div class="form-group">
+        <label class="label">Choose (.xlsx / .xls)</label>
+        <div style="margin-top: 8px;">
+            {{ form.excel_file }}
+        </div>
+        {% if form.excel_file.errors %}
+          <div style="color: var(--accent-danger); font-size: 12px; margin-top: 4px;">{{ form.excel_file.errors.0 }}</div>
+        {% endif %}
+      </div>
+      
+      <div style="display: flex; gap: 16px; margin-top: 32px;">
+        <button type="submit" class="btn btn-primary" style="flex: 1; font-weight: 700;">🚀 Start Import</button>
+        <a href="#" class="btn btn-outline" style="flex: 1;">📥 Download Template</a>
+      </div>
+    </form>
+  </div>
+
+  <!-- Instruction Section -->
+  <div class="card" style="background: #fbfcfe; border-style: dashed;">
+    <div class="card-title">Excel Columns Support</div>
+    <div style="font-size: 13px; color: var(--text-secondary);">
+      <ul style="padding-left: 20px;">
+        {% if not category %}<li style="margin-bottom: 8px;"><strong>category:</strong> Name of the course category (e.g. Python, SQL)</li>{% endif %}
+        <li style="margin-bottom: 8px;"><strong>difficulty:</strong> Choose from <code>Easy</code>, <code>Medium</code>, or <code>Hard</code></li>
+        <li style="margin-bottom: 8px;"><strong>question_text:</strong> The main question statement</li>
+        <li style="margin-bottom: 8px;"><strong>question_type:</strong> <code>MCQ</code>, <code>Short Answer</code>, or <code>Essay</code></li>
+        <li style="margin-bottom: 8px;"><strong>option_a - option_d:</strong> Answer options (MCQ only)</li>
+        <li style="margin-bottom: 8px;"><strong>correct_answer:</strong> Option letter (A/B/C/D) or full text</li>
+        <li style="margin-bottom: 8px;"><strong>marks:</strong> Quantitative value for grading</li>
+        <li style="margin-bottom: 8px;"><strong>time_limit_minutes:</strong> Per-question countdown time</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+{% if result %}
+  <div class="card" style="margin-top: 32px;">
+    <div class="card-title">Import Result Summary</div>
+    <div style="display: flex; gap: 24px; margin-bottom: 24px;">
+      <div style="padding: 16px; border-radius: var(--border-radius); background: rgba(var(--accent-primary-rgb), 0.1); color: var(--accent-primary); flex: 1; text-align: center; border: 1px solid var(--accent-primary);">
+        <div style="font-size: 24px; font-weight: 800;">{{ result.created_count }}</div>
+        <div class="stat-label" style="margin-bottom: 0;">SUCCESSFULLY IMPORTED</div>
+      </div>
+      <div style="padding: 16px; border-radius: var(--border-radius); background: #fee2e2; color: #991b1b; flex: 1; text-align: center; border: 1px solid #f87171;">
+        <div style="font-size: 24px; font-weight: 800;">{{ result.error_count }}</div>
+        <div class="stat-label" style="margin-bottom: 0;">FAILED ROWS</div>
+      </div>
+    </div>
+
+    {% if result.errors %}
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Row #</th>
+              <th>Error Detail</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for error in result.errors %}
+              <tr>
+                <td><strong>{{ error.row }}</strong></td>
+                <td style="color: var(--accent-danger);">{{ error.error }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}

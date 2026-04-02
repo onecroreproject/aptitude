@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}Test Completed — Exam Platform{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 600px; margin: 40px auto; text-align: center; padding: 60px 40px;">
+    <div style="font-size: 64px; margin-bottom: 24px;">🎉</div>
+    <div class="card-title" style="font-size: 28px; margin-bottom: 16px;">Test Completed Successfully!</div>
+    <p style="color: var(--text-secondary); font-size: 16px; line-height: 1.6; margin-bottom: 32px;">
+        Your responses have been securely submitted. The system will now evaluate your answers.
+        <br><br>
+        <span style="font-size: 14px; color: var(--text-muted);">
+            You will receive a notification once the administrator has reviewed your performance.
+        </span>
+    </p>
+    <div style="display: flex; gap: 16px; justify-content: center;">
+        <a href="{% url 'student_dashboard' %}" class="btn btn-primary" style="padding: 12px 32px;">Go to Dashboard</a>
+        <a href="{% url 'student_history' %}" class="btn btn-outline" style="padding: 12px 32px;">View My History</a>
+    </div>
+</div>
+{% endblock %}

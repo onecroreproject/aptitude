@@ -1,176 +1,136 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Aptitude Test Management{% endblock %}</title>
-    {% load static %}
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    {% block extra_css %}{% endblock %}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Exam Platform{% endblock %}</title>
+  
+  <!-- Modern Inter Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Main Styles -->
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+  
+  {% block extra_css %}{% endblock %}
 </head>
+<body class="{% block body_class %}{% endblock %}">
 
-<body>
-    <div class="dashboard-layout">
-        <!-- Sidebar -->
-        <aside class="sidebar">
-            <div class="sidebar-logo">
-                <i data-lucide="brain-circuit"></i>
-                <span>AptiPro</span>
+  <div class="app-container">
+    
+    <!-- ── Sidebar ── -->
+    {% if user.is_authenticated %}
+    <div class="sidebar" id="sidebar">
+      <div class="brand">
+        <span style="font-size: 24px;">📝</span>
+        <span>ExamPlatform</span>
+      </div>
+      
+      <nav class="sidebar-nav">
+        {% if user.is_superuser %}
+          <a href="{% url 'admin_dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}">📊 Dashboard</a>
+          <a href="{% url 'admin_categories' %}" class="nav-link {% if 'category' in request.resolver_match.url_name %}active{% endif %}">📁 Categories</a>
+          <a href="{% url 'admin_students' %}" class="nav-link {% if 'student' in request.resolver_match.url_name %}active{% endif %}">👥 Students</a>
+          <a href="{% url 'admin_exam_requests' %}" class="nav-link {% if 'request' in request.resolver_match.url_name %}active{% endif %}">⚖️ Requests</a>
+          <a href="{% url 'admin_results' %}" class="nav-link {% if 'result' in request.resolver_match.url_name %}active{% endif %}">🏅 Results</a>
+        {% else %}
+          <a href="{% url 'student_dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'student_dashboard' %}active{% endif %}">🏠 Dashboard</a>
+          <a href="{% url 'student_categories' %}" class="nav-link {% if 'category' in request.resolver_match.url_name %}active{% endif %}">📂 Exam Categories</a>
+          <a href="{% url 'student_history' %}" class="nav-link {% if 'history' in request.resolver_match.url_name %}active{% endif %}">📜 My History</a>
+          <a href="{% url 'student_profile' %}" class="nav-link {% if 'profile' in request.resolver_match.url_name %}active{% endif %}">👤 My Profile</a>
+        {% endif %}
+      </nav>
+      
+      <div style="padding: 16px; border-top: 1px solid var(--border-color);">
+        <a href="{% url 'logout' %}" class="nav-link" style="color: var(--accent-danger);">🚪 Logout</a>
+      </div>
+    </div>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    {% endif %}
+
+    <!-- ── Main Area ── -->
+    <div class="main-content">
+      
+      {% if user.is_authenticated %}
+      <header class="header">
+        <div class="mobile-toggle" onclick="toggleSidebar()">☰</div>
+        
+        <h1 style="font-size: 18px; font-weight: 700; color: var(--text-primary);">
+          {% block page_title %}Dashboard{% endblock %}
+        </h1>
+        
+        <div class="user-meta" id="userMenuTrigger" onclick="toggleUserDropdown(event)">
+          <a href="{% if user.is_superuser %}{% url 'admin_notifications' %}{% else %}{% url 'student_notifications' %}{% endif %}" class="notification-bell">
+            🔔 {% if unread_count > 0 %}<span class="notification-badge"></span>{% endif %}
+          </a>
+          
+          <div class="user-profile-trigger">
+            <div class="user-info-text">
+              <span class="user-name">{{ user.name|default:user.username }}</span>
+              <span class="user-role">{{ user.get_role_display }}</span>
             </div>
-            <nav class="sidebar-nav">
-                <ul>
-                    {% if user.is_superuser or user.is_staff %}
-                    <!-- Admin Navigation -->
-                    <li><a href="{% url 'admin_dashboard' %}"
-                            class="nav-link {% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}"><i
-                                data-lucide="layout-dashboard"></i> <span>Dashboard</span></a></li>
-                    <li><a href="{% url 'student_management' %}"
-                            class="nav-link {% if request.resolver_match.url_name == 'student_management' %}active{% endif %}"><i
-                                data-lucide="users"></i> <span>Students</span></a></li>
-                    <li><a href="{% url 'course_management' %}"
-                            class="nav-link {% if request.resolver_match.url_name == 'course_management' or request.resolver_match.url_name == 'view_course_questions' %}active{% endif %}"><i
-                                data-lucide="help-circle"></i> <span>Manage Questions</span></a></li>
-                    <li><a href="{% url 'admin_results' %}"
-                            class="nav-link {% if request.resolver_match.url_name == 'admin_results' %}active{% endif %}"><i
-                                data-lucide="bar-chart-2"></i> <span>Results</span></a></li>
-                    <li><a href="{% url 'certificate_management' %}"
-                            class="nav-link {% if request.resolver_match.url_name == 'certificate_management' %}active{% endif %}"><i
-                                data-lucide="award"></i> <span>Certificates</span></a></li>
-                    {% else %}
-                    <!-- Student Navigation -->
-                    <li><a href="{% url 'student_dashboard' %}"
-                            class="nav-link {% if request.resolver_match.url_name == 'student_dashboard' %}active{% endif %}"><i
-                                data-lucide="layout-dashboard"></i> <span>Dashboard</span></a></li>
-                    <li><a href="{% url 'available_exams' %}"
-                            class="nav-link {% if request.resolver_match.url_name == 'available_exams' %}active{% endif %}"><i
-                                data-lucide="clipboard-list"></i> <span>Exams</span></a></li>
-                    <li><a href="{% url 'student_results' %}"
-                            class="nav-link {% if request.resolver_match.url_name == 'student_results' %}active{% endif %}"><i
-                                data-lucide="check-circle"></i> <span>Results</span></a></li>
-                    <li><a href="{% url 'student_certificates' %}"
-                            class="nav-link {% if request.resolver_match.url_name == 'student_certificates' %}active{% endif %}"><i
-                                data-lucide="award"></i> <span>Certificates</span></a></li>
-                    <li><a href="{% url 'profile' %}"
-                            class="nav-link {% if request.resolver_match.url_name == 'profile' %}active{% endif %}"><i
-                                data-lucide="user"></i> <span>Profile</span></a></li>
-                    {% endif %}
-                    <li><a href="{% url 'logout' %}" class="nav-link mt-4" style="color: var(--danger);"><i
-                                data-lucide="log-out"></i> <span>Logout</span></a></li>
-                </ul>
-            </nav>
-        </aside>
-
-        <!-- Main Content -->
-        <main class="main-content">
-            <header class="flex justify-between items-center mb-4">
-                <div class="flex items-center gap-4">
-                    <button id="sidebar-toggle" class="sidebar-toggle-btn" aria-label="Toggle Sidebar">
-                        <i data-lucide="menu"></i>
-                    </button>
-                    <h1 style="font-size: 1.5rem; font-weight: 700;">{% block header_title %}Dashboard{% endblock %}
-                    </h1>
-                </div>
-                <div class="user-profile flex items-center gap-2">
-                    <span style="font-weight: 500;">{{ user.first_name }} {{ user.last_name }}</span>
-                    {% if user.profile_pic %}
-                    <img src="{{ user.profile_pic.url }}" alt="Profile"
-                        style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
-                    {% else %}
-                    <div
-                        style="width: 40px; height: 40px; border-radius: 50%; background: var(--primary-light); color: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 700;">
-                        {{ user.first_name.0 }}</div>
-                    {% endif %}
-                </div>
-            </header>
-
-            {% if messages %}
-            <div class="messages mb-4">
-                {% for message in messages %}
-                <div class="card"
-                    style="padding: 1rem; margin-bottom: 0.5rem; border-left: 4px solid {% if message.tags == 'success' %}var(--success){% elif message.tags == 'error' %}var(--danger){% else %}var(--warning){% endif %}; background: {% if message.tags == 'success' %}var(--success-light){% elif message.tags == 'error' %}var(--danger-light){% else %}var(--warning-light){% endif %};">
-                    {{ message }}
-                </div>
-                {% endfor %}
-            </div>
+            {% if user.profile_photo %}
+              <img src="{{ user.profile_photo.url }}" alt="Profile" class="profile-circle">
+            {% else %}
+              <div class="profile-placeholder">{{ user.username.0|upper }}</div>
             {% endif %}
 
-            {% block content %}{% endblock %}
-        </main>
-    </div>
+            <!-- Dropdown Menu -->
+            <div class="user-dropdown" id="userDropdown">
+              <a href="{% if user.is_superuser %}/admin/{% else %}{% url 'student_profile' %}{% endif %}" class="dropdown-item">👤 View Profile</a>
+              <a href="{% url 'logout' %}" class="dropdown-item" style="color: var(--accent-danger); border-top: 1px solid var(--border-color);">🚪 Logout Session</a>
+            </div>
+          </div>
+        </div>
+      </header>
+      {% endif %}
 
-    <script>
-        lucide.createIcons();
-
-        // Sidebar Persistence & Toggle Logic
-        const sidebar = document.querySelector('.sidebar');
-        const sidebarToggle = document.getElementById('sidebar-toggle');
-        const mainContent = document.querySelector('.main-content');
+      <main class="content-body">
+        {% if messages %}
+          {% for message in messages %}
+            <div class="card" style="border-left: 4px solid var(--accent-{% if message.tags == 'error' %}danger{% elif message.tags == 'success' %}success{% else %}primary{% endif %}); padding: 16px; margin-bottom: 24px;">
+              {{ message }}
+            </div>
+          {% endfor %}
+        {% endif %}
         
-        const isMobile = () => window.innerWidth <= 768;
+        {% block content %}{% endblock %}
+      </main>
+      
+    </div>
+  </div>
 
-        function updateSidebarIcon(isCollapsed) {
-            if (!sidebarToggle) return;
-            const icon = sidebarToggle.querySelector('i');
-            if (isMobile()) {
-                // On mobile, if sidebar is active (open), show X, else MENU
-                const isActive = sidebar.classList.contains('active');
-                icon.setAttribute('data-lucide', isActive ? 'x' : 'menu');
-            } else {
-                // On desktop, if collapsed (mini), keep MENU or show MENU
-                // Usually on desktop the icon stays as hamburger to expand
-                icon.setAttribute('data-lucide', 'menu');
-            }
-            lucide.createIcons();
+  <script>
+    function toggleSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const overlay = document.getElementById('sidebarOverlay');
+      sidebar.classList.toggle('active');
+      overlay.style.display = sidebar.classList.contains('active') ? 'block' : 'none';
+    }
+
+    function toggleUserDropdown(event) {
+      event.stopPropagation();
+      const dropdown = document.getElementById('userDropdown');
+      dropdown.classList.toggle('active');
+    }
+
+    // Close dropdowns when clicking outside
+    window.onclick = function(event) {
+      const dropdown = document.getElementById('userDropdown');
+      if (dropdown && dropdown.classList.contains('active')) {
+        if (!event.target.closest('#userMenuTrigger')) {
+          dropdown.classList.remove('active');
         }
+      }
+    }
 
-        function updateSidebar() {
-            const state = localStorage.getItem('sidebar-state');
-            
-            if (isMobile()) {
-                if (state === 'open') {
-                    sidebar.classList.add('active');
-                } else {
-                    sidebar.classList.remove('active');
-                }
-                sidebar.classList.remove('collapsed');
-                mainContent.classList.remove('sidebar-collapsed');
-            } else {
-                if (state === 'collapsed') {
-                    sidebar.classList.add('collapsed');
-                    mainContent.classList.add('sidebar-collapsed');
-                } else {
-                    sidebar.classList.remove('collapsed');
-                    mainContent.classList.remove('sidebar-collapsed');
-                }
-                sidebar.classList.remove('active');
-            }
-            updateSidebarIcon();
-        }
-
-        updateSidebar();
-
-        if (sidebarToggle) {
-            sidebarToggle.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (isMobile()) {
-                    const isOpen = sidebar.classList.toggle('active');
-                    localStorage.setItem('sidebar-state', isOpen ? 'open' : 'closed');
-                } else {
-                    const isCollapsed = sidebar.classList.toggle('collapsed');
-                    mainContent.classList.toggle('sidebar-collapsed');
-                    localStorage.setItem('sidebar-state', isCollapsed ? 'collapsed' : 'expanded');
-                }
-                updateSidebarIcon();
-            });
-        }
-
-        window.addEventListener('resize', updateSidebar);
-    </script>
-    {% block extra_js %}{% endblock %}
+    if (document.getElementById('sidebarOverlay')) {
+      document.getElementById('sidebarOverlay').onclick = toggleSidebar;
+    }
+  </script>
+  
+  {% block extra_js %}{% endblock %}
 </body>
-
 </html>

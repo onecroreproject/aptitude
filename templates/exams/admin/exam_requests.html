@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Exam Requests - Admin Dashboard{% endblock %}
+{% block page_title %}Exam Access Requests{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
+    <div class="card-title">Pending Requests ({{ pending_count }})</div>
+    <form method="GET" style="display: flex; gap: 12px; align-items: center;">
+      <select name="status" class="input" style="padding: 8px;">
+        <option value="">All Status</option>
+        {% for val, label in status_choices %}
+          <option value="{{ val }}" {% if current_status == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn btn-outline btn-sm">Filter</button>
+    </form>
+  </div>
+
+  <form action="{% url 'admin_bulk_request_action' %}" method="POST">
+    {% csrf_token %}
+    <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+      <button type="submit" name="action" value="approve" class="btn btn-success btn-sm">✅ Bulk Approve</button>
+      <button type="button" onclick="showBulkReject()" class="btn btn-danger btn-sm">❌ Bulk Reject</button>
+      <div id="bulkRejectBox" style="display: none; flex-grow: 1; gap: 12px; align-items: center;">
+        <input type="text" name="bulk_reason" class="input" placeholder="Bulk rejection reason..." style="padding: 8px; font-size: 13px;">
+        <button type="submit" name="action" value="reject" class="btn btn-danger btn-sm">Confirm Reject</button>
+      </div>
+    </div>
+    
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th width="40"><input type="checkbox" id="selectAll"></th>
+            <th>Student</th>
+            <th>Category</th>
+            <th>Requested At</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for req in requests %}
+            <tr>
+              <td><input type="checkbox" name="selected_requests" value="{{ req.id }}" class="row-checkbox"></td>
+              <td style="font-weight: 700;">{{ req.student.username }}</td>
+              <td><span class="badge badge-approved" style="background: var(--accent-primary-light); color: var(--accent-primary);">{{ req.category.name }}</span></td>
+              <td style="font-size: 12px; font-weight: 500;">{{ req.requested_at|date:"M d, H:i" }}</td>
+              <td><span class="badge badge-{{ req.status|lower }}">{{ req.status }}</span></td>
+              <td>
+                {% if req.status == 'Pending' %}
+                  <div style="display: flex; gap: 8px;">
+                    <button type="button" onclick="approveSingle('{{ req.id }}')" class="btn btn-outline btn-sm" style="color: var(--accent-success); border-color: var(--accent-success);">Approve</button>
+                    <button type="button" onclick="rejectSingle('{{ req.id }}')" class="btn btn-outline btn-sm" style="color: var(--accent-danger); border-color: var(--accent-danger);">Reject</button>
+                  </div>
+                {% else %}
+                  <span style="font-size: 11px; color: var(--text-muted);">{{ req.reviewed_at|date:"M d, Y" }}</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 48px;">No requests found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </form>
+</div>
+
+<!-- Forms for actions -->
+<form id="approveForm" method="POST" style="display: none;">{% csrf_token %}</form>
+<form id="rejectForm" method="POST" style="display: none;">
+  {% csrf_token %}
+  <input type="hidden" name="rejection_reason" id="rejectReasonField">
+</form>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.getElementById('selectAll').onclick = function() {
+    const checkboxes = document.getElementsByClassName('row-checkbox');
+    for (let checkbox of checkboxes) {
+      checkbox.checked = this.checked;
+    }
+  };
+
+  function approveSingle(reqId) {
+    if (confirm('Approve this request and generate paper?')) {
+      const form = document.getElementById('approveForm');
+      form.action = `/admin-panel/requests/${reqId}/approve/`;
+      form.submit();
+    }
+  }
+
+  function rejectSingle(reqId) {
+    const reason = prompt('Enter rejection reason:');
+    if (reason !== null) {
+      const form = document.getElementById('rejectForm');
+      form.action = `/admin-panel/requests/${reqId}/reject/`;
+      document.getElementById('rejectReasonField').value = reason;
+      form.submit();
+    }
+  }
+
+  function showBulkReject() {
+    const box = document.getElementById('bulkRejectBox');
+    box.style.display = box.style.display === 'none' ? 'flex' : 'none';
+  }
+</script>
+{% endblock %}

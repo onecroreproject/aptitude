@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Question Detail — Admin{% endblock %}
+{% block page_title %}Question Detail{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 24px;">
+    <a href="{% url 'admin_category_detail' question.category.pk %}" style="text-decoration: none; color: var(--text-secondary); font-size: 14px; display: flex; align-items: center; gap: 4px;">
+        ← Back to {{ question.category.name }}
+    </a>
+</div>
+
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px;">
+        <div>
+            <div class="card-title" style="margin-bottom: 8px;">Question Analysis</div>
+            <p style="color: var(--text-secondary); font-size: 14px;">Reviewing full question details and metadata.</p>
+        </div>
+        <div style="display: flex; gap: 12px;">
+            <a href="{% url 'admin_edit_question' question.pk %}" class="btn btn-outline">✏️ Edit Question</a>
+            <form action="{% url 'admin_delete_question' question.pk %}" method="POST" onsubmit="return confirm('Delete this question?');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline" style="color: var(--accent-danger); border-color: var(--accent-danger);">🗑️ Delete</button>
+            </form>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 40px;">
+        <!-- Question Content -->
+        <div>
+            <div style="margin-bottom: 32px;">
+                <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 12px;">Question Text</h4>
+                <div style="font-size: 18px; font-weight: 600; line-height: 1.6; color: var(--text-primary); padding: 20px; background: var(--bg-secondary); border-radius: 12px; border: 1px solid var(--border-color);">
+                    {{ question.question_text }}
+                </div>
+            </div>
+
+            {% if question.question_type == 'MCQ' or question.question_type == 'True/False' %}
+            <div>
+                <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 12px;">Answer Options</h4>
+                <div style="display: grid; gap: 12px;">
+                    {% if question.option_a %}
+                    <div style="padding: 16px; border-radius: 10px; border: 1px solid var(--border-color); background: {% if question.correct_answer == 'A' %}rgba(var(--accent-secondary-rgb), 0.1){% else %}var(--bg-secondary){% endif %}; position: relative;">
+                        <span style="font-weight: 700; margin-right: 8px;">A.</span> {{ question.option_a }}
+                        {% if question.correct_answer == 'A' %}<span style="position: absolute; right: 16px; color: var(--accent-secondary); font-weight: 700;">✅ CORRECT</span>{% endif %}
+                    </div>
+                    {% endif %}
+                    {% if question.option_b %}
+                    <div style="padding: 16px; border-radius: 10px; border: 1px solid var(--border-color); background: {% if question.correct_answer == 'B' %}rgba(var(--accent-secondary-rgb), 0.1){% else %}var(--bg-secondary){% endif %}; position: relative;">
+                        <span style="font-weight: 700; margin-right: 8px;">B.</span> {{ question.option_b }}
+                        {% if question.correct_answer == 'B' %}<span style="position: absolute; right: 16px; color: var(--accent-secondary); font-weight: 700;">✅ CORRECT</span>{% endif %}
+                    </div>
+                    {% endif %}
+                    {% if question.option_c %}
+                    <div style="padding: 16px; border-radius: 10px; border: 1px solid var(--border-color); background: {% if question.correct_answer == 'C' %}rgba(var(--accent-secondary-rgb), 0.1){% else %}var(--bg-secondary){% endif %}; position: relative;">
+                        <span style="font-weight: 700; margin-right: 8px;">C.</span> {{ question.option_c }}
+                        {% if question.correct_answer == 'C' %}<span style="position: absolute; right: 16px; color: var(--accent-secondary); font-weight: 700;">✅ CORRECT</span>{% endif %}
+                    </div>
+                    {% endif %}
+                    {% if question.option_d %}
+                    <div style="padding: 16px; border-radius: 10px; border: 1px solid var(--border-color); background: {% if question.correct_answer == 'D' %}rgba(var(--accent-secondary-rgb), 0.1){% else %}var(--bg-secondary){% endif %}; position: relative;">
+                        <span style="font-weight: 700; margin-right: 8px;">D.</span> {{ question.option_d }}
+                        {% if question.correct_answer == 'D' %}<span style="position: absolute; right: 16px; color: var(--accent-secondary); font-weight: 700;">✅ CORRECT</span>{% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Question Metadata -->
+        <div>
+            <div class="card" style="margin: 0; background: var(--bg-tertiary); border: 1px solid var(--border-color);">
+                <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 20px;">Metadata</h4>
+                
+                <div style="display: grid; gap: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: var(--text-secondary);">Subject / Category</span>
+                        <span style="font-weight: 600;">{{ question.category.name }}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: var(--text-secondary);">Difficulty Level</span>
+                        <span class="difficulty-badge {{ question.difficulty|lower }}">{{ question.difficulty }}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: var(--text-secondary);">Question Type</span>
+                        <span class="badge badge-info">{{ question.get_question_type_display }}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 16px; margin-top: 8px;">
+                        <span style="color: var(--text-secondary);">Assigned Marks</span>
+                        <span style="font-weight: 800; font-size: 18px; color: var(--accent-primary);">{{ question.marks }} pts</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: var(--text-secondary);">Time Limit</span>
+                        <span style="font-weight: 600;">{{ question.time_limit_minutes }} Minutes</span>
+                    </div>
+                </div>
+
+                <div style="margin-top: 32px; font-size: 11px; color: var(--text-muted); line-height: 1.6;">
+                    Created: {{ question.created_at|date:"M d, Y H:i" }}<br>
+                    Last Updated: {{ question.updated_at|date:"M d, Y H:i" }}<br>
+                    By: {{ question.created_by.username|default:"System" }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

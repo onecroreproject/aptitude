@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Admin Dashboard - ExamPlatform{% endblock %}
+{% block page_title %}Admin Performance Dashboard{% endblock %}
+
+{% block content %}
+<div class="stats-grid">
+  <div class="stat-box">
+    <div class="stat-label">👥 Total Students</div>
+    <div class="stat-value">{{ total_students }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">❓ Active Questions</div>
+    <div class="stat-value">{{ total_questions }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">📝 Exams Taken</div>
+    <div class="stat-value">{{ total_exams }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">⚖️ Pending Requests</div>
+    <div class="stat-value">{{ pending_requests|default:0 }}</div>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 3fr 2fr; gap: 32px; margin-top: 32px;">
+  
+  <!-- Recent Exam Requests -->
+  <div class="card">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
+      <div class="card-title">Recent Exam Requests</div>
+      <a href="{% url 'admin_exam_requests' %}" class="btn btn-outline btn-sm">View All</a>
+    </div>
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Student</th>
+            <th>Category</th>
+            <th>Status</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for req in recent_requests %}
+            <tr>
+              <td style="font-weight: 700;">{{ req.student.username }}</td>
+              <td>{{ req.category.name }}</td>
+              <td><span class="badge badge-{{ req.status|lower }}">{{ req.status }}</span></td>
+              <td style="font-size: 12px; font-weight: 500;">{{ req.requested_at|date:"M d, Y" }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 32px;">No recent requests.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Performance Summary -->
+  <div class="card">
+    <div class="card-title">Performance Overview</div>
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 40px; text-align: center; gap: 24px;">
+      <div style="flex: 1;">
+        <div style="font-size: 28px; font-weight: 800; color: var(--accent-success);">{{ pass_rate }}%</div>
+        <div class="stat-label" style="font-size: 11px;">PASS RATE</div>
+      </div>
+      <div style="flex: 1; border-left: 1px solid var(--border-color); border-right: 1px solid var(--border-color);">
+        <div style="font-size: 28px; font-weight: 800; color: var(--accent-danger);">{{ fail_rate }}%</div>
+        <div class="stat-label" style="font-size: 11px;">FAIL RATE</div>
+      </div>
+      <div style="flex: 1;">
+        <div style="font-size: 28px; font-weight: 800; color: var(--accent-info);">{{ avg_score }}</div>
+        <div class="stat-label" style="font-size: 11px;">AVG SCORE</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-top: 32px;">
+  
+  <!-- Category Distribution (Chart info) -->
+  <div class="card">
+    <div class="card-title">Question Banks by Category</div>
+    <canvas id="categoryChart" height="200"></canvas>
+  </div>
+  
+  <!-- Difficulty Distribution (Chart info) -->
+  <div class="card">
+    <div class="card-title">Difficulty Distribution</div>
+    <canvas id="difficultyChart" height="200"></canvas>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const catCtx = document.getElementById('categoryChart').getContext('2d');
+  new Chart(catCtx, {
+    type: 'bar',
+    data: {
+      labels: {{ category_labels|safe }},
+      datasets: [{
+        label: 'Question Count',
+        data: {{ category_data|safe }},
+        backgroundColor: '#3b82f6',
+        borderRadius: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+
+  const diffCtx = document.getElementById('difficultyChart').getContext('2d');
+  new Chart(diffCtx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Easy', 'Medium', 'Hard'],
+      datasets: [{
+        data: {{ difficulty_data|safe }},
+        backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      cutout: '70%',
+      plugins: { legend: { position: 'bottom' } }
+    }
+  });
+</script>
+{% endblock %}

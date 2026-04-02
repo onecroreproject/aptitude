@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Student Dashboard - ExamPlatform{% endblock %}
+{% block page_title %}Student Dashboard{% endblock %}
+
+{% block content %}
+<div class="stats-grid">
+  <div class="stat-box">
+    <div class="stat-label">📜 Pending Requests</div>
+    <div class="stat-value">{{ pending_requests }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">✅ Available Exams</div>
+    <div class="stat-value">{{ available_exams.count }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">📊 Completed Exams</div>
+    <div class="stat-value">{{ completed_exams }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">🔔 Unread Notifications</div>
+    <div class="stat-value">{{ unread_count }}</div>
+  </div>
+</div>
+
+<div class="card" style="margin-top: 32px;">
+  <div class="card-title">🚀 Request an Exam</div>
+  <p style="color: var(--text-secondary); margin-bottom: 24px;">
+    Select a category and submit a request to take an exam. The admin will review and approve your access.
+  </p>
+  
+  <a href="{% url 'student_categories' %}" class="btn btn-primary">Browse Exam Categories</a>
+</div>
+
+<div class="grid-2" style="margin-top: 32px;">
+  
+  <!-- Available Exams -->
+  <div class="card">
+    <div class="card-title">📖 Available Exams</div>
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Duration</th>
+            <th>Marks</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for paper in available_exams %}
+            <tr>
+              <td style="font-weight: 700;">{{ paper.category.name }}</td>
+              <td>{{ paper.total_duration_minutes }}m</td>
+              <td>{{ paper.total_marks }}</td>
+              <td>
+                <a href="{% url 'take_exam' paper.id %}" class="btn btn-success btn-sm">Start Exam</a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 32px;">
+                No approved exams ready. Contact your admin or browse categories to request access.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  
+  <!-- Recent Requests -->
+  <div class="card">
+    <div class="card-title">⚖️ Recent Requests</div>
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Status</th>
+            <th>Notes / Message</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for req in recent_requests %}
+            <tr>
+              <td>{{ req.category.name }}</td>
+              <td>
+                <span class="badge badge-{{ req.status|lower }}">{{ req.status }}</span>
+              </td>
+              <td>
+                {% if req.status == 'Rejected' %}
+                  <span style="color: var(--accent-danger); font-weight: 600;">Better luck next time.</span>
+                  {% if req.rejection_reason %}
+                    <br><small style="color: var(--text-muted);">{{ req.rejection_reason }}</small>
+                  {% endif %}
+                {% elif req.status == 'Approved' %}
+                  <span style="color: var(--accent-secondary);">Proceed to start exam.</span>
+                {% else %}
+                  <span style="color: var(--text-muted);">Waiting for review...</span>
+                {% endif %}
+              </td>
+              <td style="font-size: 12px;">{{ req.requested_at|date:"M d, Y" }}</td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 32px;">
+                No recent requests found.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

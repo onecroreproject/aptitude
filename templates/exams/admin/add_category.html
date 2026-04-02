@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% if edit %}Edit{% else %}Add{% endif %} Category - Admin Dashboard{% endblock %}
+{% block page_title %}{% if edit %}Update{% else %}Create{% endif %} Exam Category{% endblock %}
+
+{% block content %}
+<div class="auth-page" style="display: flex; align-items: flex-start; justify-content: center; padding-top: 50px; min-height: 0;">
+  <div class="auth-card" style="width: 100%; max-width: 600px;">
+    <h2 style="font-size: 20px; font-weight: 800; color: var(--text-primary); margin-bottom: 24px;">
+      {% if edit %}Modify Category: {{ form.instance.name }}{% else %}New Category Information{% endif %}
+    </h2>
+    
+    <form method="POST">
+      {% csrf_token %}
+      
+      {% for field in form %}
+        <div class="form-group">
+          {{ field.label_tag }}
+          {{ field }}
+          {% if field.errors %}
+            <div style="color: var(--accent-danger); font-size: 12px; margin-top: 4px;">{{ field.errors.0 }}</div>
+          {% endif %}
+          {% if field.help_text %}
+            <div style="color: var(--text-muted); font-size: 11px; margin-top: 4px;">{{ field.help_text }}</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+      
+      <div style="display: flex; gap: 16px; justify-content: flex-end; margin-top: 32px;">
+        <a href="{% url 'admin_categories' %}" class="btn btn-outline" style="min-width: 100px;">Cancel</a>
+        <button type="submit" class="btn btn-primary" style="min-width: 150px;">
+          {% if edit %}💾 Save Changes{% else %}✨ Create Category{% endif %}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

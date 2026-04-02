@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block title %}{% if edit %}Edit{% else %}Add{% endif %} Question — Admin{% endblock %}
+{% block page_title %}{% if edit %}Edit{% else %}Add{% endif %} Question{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 24px;">
+    {% if edit %}
+        <a href="{% url 'admin_category_detail' question.category.pk %}" style="text-decoration: none; color: var(--text-secondary); font-size: 14px; display: flex; align-items: center; gap: 4px;">
+            ← Back to {{ question.category.name }}
+        </a>
+    {% elif category_id %}
+        <a href="{% url 'admin_category_detail' category_id %}" style="text-decoration: none; color: var(--text-secondary); font-size: 14px; display: flex; align-items: center; gap: 4px;">
+            ← Back to Category
+        </a>
+    {% else %}
+        <a href="{% url 'admin_questions' %}" style="text-decoration: none; color: var(--text-secondary); font-size: 14px; display: flex; align-items: center; gap: 4px;">
+            ← Back to Question Bank
+        </a>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="card-title" style="margin-bottom: 24px;">
+        {% if edit %}✏️ Edit Question #{{ question.id|stringformat:".8s" }}{% else %}➕ New Question{% endif %}
+    </div>
+    
+    <form method="post" id="add-question-form">
+        {% csrf_token %}
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+            {% for field in form %}
+                <div class="form-group" style="{% if field.name == 'question_text' or field.name == 'correct_answer' %}grid-column: 1 / -1;{% endif %}">
+                    <label for="{{ field.id_for_label }}" style="display: block; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">
+                        {{ field.label }}
+                    </label>
+                    {{ field }}
+                    {% if field.errors %}<div style="color: var(--accent-danger); font-size: 12px; margin-top: 4px;">{{ field.errors.0 }}</div>{% endif %}
+                    {% if field.help_text %}<div style="color: var(--text-muted); font-size: 11px; margin-top: 4px;">{{ field.help_text }}</div>{% endif %}
+                </div>
+            {% endfor %}
+        </div>
+
+        <div style="display: flex; gap: 12px; margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border-color);">
+            <button type="submit" class="btn btn-primary" style="padding: 12px 32px; font-weight: 700;">
+                {% if edit %}Save Changes{% else %}Create Question{% endif %}
+            </button>
+            
+            {% if edit %}
+                <a href="{% url 'admin_category_detail' question.category.pk %}" class="btn btn-outline" style="padding: 12px 32px;">Cancel</a>
+            {% elif category_id %}
+                <a href="{% url 'admin_category_detail' category_id %}" class="btn btn-outline" style="padding: 12px 32px;">Cancel</a>
+            {% else %}
+                <a href="{% url 'admin_questions' %}" class="btn btn-outline" style="padding: 12px 32px;">Cancel</a>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
+<style>
+    .form-group input, .form-group select, .form-group textarea {
+        width: 100%;
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+        font-family: inherit;
+        font-size: 14px;
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+        border-color: var(--accent-primary);
+        outline: none;
+    }
+</style>
+{% endblock %}

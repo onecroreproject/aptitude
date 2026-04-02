@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+{% block title %}Exam Results — Admin{% endblock %}
+{% block page_title %}Student Performance Results{% endblock %}
+
+{% block content %}
+<div class="stats-grid" style="margin-bottom: 32px;">
+    <div class="stat-box">
+        <div class="stat-label">📜 Evaluated Exams</div>
+        <div class="stat-value">{{ total_evaluated|default:0 }}</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-label">📊 Average Score</div>
+        <div class="stat-value">{{ avg_marks|default:0 }}%</div>
+    </div>
+</div>
+
+<div class="card">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+        <div class="card-title">All Results</div>
+        
+        <form method="GET" style="display: flex; gap: 12px; flex: 1; max-width: 600px;">
+            <input type="text" name="search" class="form-input" placeholder="Search by student name..." value="{{ search }}" style="flex: 2; min-width: 200px;">
+            <select name="status" class="form-input" style="flex: 1; min-width: 120px;">
+                <option value="">All Status</option>
+                {% for val, label in status_choices %}
+                    <option value="{{ val }}" {% if val == current_status %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-primary">Filter</button>
+            {% if search or current_status %}<a href="{% url 'admin_results' %}" class="btn btn-outline">Clear</a>{% endif %}
+        </form>
+    </div>
+
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Student</th>
+                    <th>Category</th>
+                    <th>Score</th>
+                    <th>Percentage</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in results %}
+                <tr>
+                    <td style="font-weight: 700;">{{ r.student.username }}</td>
+                    <td>{{ r.exam_paper.category.name }}</td>
+                    <td style="font-weight: 600;">{{ r.total_marks_obtained|floatformat:0 }} / {{ r.total_marks_possible }}</td>
+                    <td>
+                        <span class="badge {% if r.is_passed %}badge-approved{% else %}badge-rejected{% endif %}" style="font-weight: 700;">
+                            {{ r.percentage }}%
+                        </span>
+                    </td>
+                    <td><span class="badge badge-{{ r.status|lower }}">{{ r.status }}</span></td>
+                    <td style="font-size: 12px; color: var(--text-muted);">{{ r.started_at|date:"M d, Y" }}</td>
+                    <td><a href="{% url 'admin_result_detail' r.id %}" class="btn btn-outline btn-sm">View Report</a></td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 48px;">
+                        No exam results found matching your criteria.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if is_paginated %}
+    <div style="margin-top: 24px; display: flex; justify-content: center; gap: 8px;">
+        {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}&search={{ search }}&status={{ current_status }}" class="btn btn-outline btn-sm">Previous</a>
+        {% endif %}
+        <span style="padding: 4px 12px; font-weight: 600;">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}&search={{ search }}&status={{ current_status }}" class="btn btn-outline btn-sm">Next</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

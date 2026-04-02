@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% block title %}Notifications — Exam Platform{% endblock %}
+{% block page_title %}My Notifications{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 900px; margin: 0 auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <div class="card-title">Latest Alerts</div>
+        {% if unread_count > 0 %}
+            <form method="post" action="{% url 'mark_all_read' %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline btn-sm">Mark all as read</button>
+            </form>
+        {% endif %}
+    </div>
+
+    <div class="notification-list">
+        {% for notif in notifications %}
+            <div class="notification-card {% if not notif.is_read %}unread{% endif %}" 
+                 style="display: flex; gap: 20px; padding: 20px; border-bottom: 1px solid var(--border-color); position: relative; transition: background 0.2s;">
+                
+                <div style="font-size: 24px;">
+                    {% if notif.notification_type == 'Approval' %}✅
+                    {% elif notif.notification_type == 'Rejection' %}❌
+                    {% else %}ℹ️{% endif %}
+                </div>
+                
+                <div style="flex: 1;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <h4 style="margin: 0; font-size: 16px; font-weight: 700;">{{ notif.title }}</h4>
+                        <span style="font-size: 11px; color: var(--text-muted);">{{ notif.created_at|timesince }} ago</span>
+                    </div>
+                    <p style="margin: 8px 0 0; font-size: 14px; color: var(--text-secondary); line-height: 1.5;">
+                        {{ notif.message }}
+                    </p>
+                </div>
+                
+                {% if not notif.is_read %}
+                    <div style="width: 8px; height: 8px; border-radius: 50%; background: var(--accent-primary); position: absolute; right: 20px; top: 45%;"></div>
+                {% endif %}
+            </div>
+        {% empty %}
+            <div style="text-align: center; padding: 60px; color: var(--text-muted);">
+                <div style="font-size: 48px; margin-bottom: 16px;">🔕</div>
+                <p>No new notifications to show.</p>
+            </div>
+        {% endfor %}
+    </div>
+
+    {% if is_paginated %}
+    <div style="margin-top: 24px; display: flex; justify-content: center; gap: 8px;">
+        {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}" class="btn btn-outline btn-sm">Prev</a>
+        {% endif %}
+        <span style="padding: 4px 12px; font-weight: 600;">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}" class="btn btn-outline btn-sm">Next</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .notification-card.unread { background: rgba(var(--accent-primary-rgb), 0.05); }
+    .notification-card:last-child { border-bottom: none; }
+    .notification-card:hover { background: rgba(0,0,0,0.02); }
+</style>
+{% endblock %}
