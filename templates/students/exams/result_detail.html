@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block header_title %}Exam Result{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 600px; margin: 0 auto; padding: 3rem; text-align: center;">
+    {% if result.pass_status %}
+        <div style="width: 80px; height: 80px; background: var(--success-light); color: var(--success); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem;">
+            <i data-lucide="award" style="width: 48px; height: 48px;"></i>
+        </div>
+        <h2 style="font-size: 2rem; font-weight: 800; color: var(--success);" class="mb-2">Congratulations!</h2>
+        <p class="mb-4" style="color: var(--text-muted);">You have successfully passed the {{ result.course.name }} aptitude test.</p>
+    {% else %}
+        <div style="width: 80px; height: 80px; background: var(--danger-light); color: var(--danger); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem;">
+            <i data-lucide="frown" style="width: 48px; height: 48px;"></i>
+        </div>
+        <h2 style="font-size: 2rem; font-weight: 800; color: var(--danger);" class="mb-2">Hard Luck!</h2>
+        <p class="mb-4" style="color: var(--text-muted);">You didn't meet the passing criteria (60%) for the {{ result.course.name }}. Don't give up!</p>
+    {% endif %}
+
+    <div class="flex justify-between items-center py-4 mb-4" style="border-top: 1px dashed var(--border); border-bottom: 1px dashed var(--border);">
+        <div class="text-left">
+            <span style="display: block; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Score Obtained</span>
+            <span style="font-size: 1.5rem; font-weight: 700;">{{ result.score|floatformat:1 }} / {{ result.total_marks }}</span>
+        </div>
+        <div class="text-right">
+            <span style="display: block; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Percentage</span>
+            <span style="font-size: 1.5rem; font-weight: 700; color: {% if result.pass_status %}var(--success){% else %}var(--danger){% endif %};">{{ result.percentage|floatformat:1 }}%</span>
+        </div>
+    </div>
+
+    <div class="flex gap-4">
+        <a href="{% url 'student_dashboard' %}" class="btn btn-outline" style="flex: 1;">Back to Dashboard</a>
+        {% if result.pass_status %}
+            <a href="{% url 'student_certificates' %}" class="btn btn-success" style="flex: 1;">Download Certificate</a>
+        {% else %}
+            <a href="{% url 'take_exam' result.course.id %}" class="btn btn-primary" style="flex: 1;">Retake Exam</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

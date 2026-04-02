@@ -1,0 +1,9 @@
+Django>=4.2,<5.0
+pillow
+pandas
+openpyxl
+qrcode[pil]
+xhtml2pdf
+django-environ
+python-dotenv
+whitenoise

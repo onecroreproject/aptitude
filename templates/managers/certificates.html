@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block header_title %}Certificate Management{% endblock %}
+
+{% block content %}
+<div class="stats-grid" style="grid-template-columns: 2fr 1fr;">
+    <div class="card">
+        <h3 class="mb-4" style="font-size: 1.125rem; font-weight: 700;">Issued Certificates</h3>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Student</th>
+                        <th>Course</th>
+                        <th>Date</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cert in certificates %}
+                    <tr>
+                        <td style="font-weight: 700; color: var(--primary);">{{ cert.certificate_id }}</td>
+                        <td style="font-weight: 600;">{{ cert.result.user.first_name }} {{ cert.result.user.last_name }}</td>
+                        <td style="font-weight: 500;">{{ cert.result.course.name }}</td>
+                        <td>{{ cert.issued_at|date:"d M Y" }}</td>
+                        <td class="flex gap-2">
+                            <a href="{{ cert.qr_code.url }}" target="_blank" class="btn btn-outline" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;"><i data-lucide="eye" style="width: 14px;"></i> View</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" style="padding: 2rem; text-align: center; color: var(--text-muted);">No certificates issued yet.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="card" style="background: var(--primary-light); border: 2px dashed var(--primary);">
+        <h3 class="mb-2" style="font-size: 1.125rem; font-weight: 700; color: var(--primary);">Manual Trigger</h3>
+        <p class="mb-4" style="font-size: 0.8125rem; color: var(--text-muted);">There are <strong>{{ pending_count }}</strong> students who have passed but certificates were not generated.</p>
+        
+        <form method="POST">
+            {% csrf_token %}
+            <input type="hidden" name="generate_all" value="true">
+            <button type="submit" class="btn btn-primary" style="width: 100%;" {% if pending_count == 0 %}disabled{% endif %}>
+                <i data-lucide="zap"></i> Generate All Certificates
+            </button>
+        </form>
+        
+        <div class="mt-4 p-4" style="background: var(--white); border-radius: 0.5rem; font-size: 0.75rem;">
+            <p style="font-weight: 700; margin-bottom: 0.5rem;">Template Settings</p>
+            <div class="flex items-center gap-2 mb-2">
+                <i data-lucide="file-text" style="width: 14px; color: var(--primary);"></i>
+                <span>Standard Certificate Template (Active)</span>
+            </div>
+            <button class="btn btn-outline" style="width: 100%; font-size: 0.75rem;">Upload New Template</button>
+        </div>
+    </div>
+</div>
+{% endblock %}

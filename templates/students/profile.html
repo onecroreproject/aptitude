@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+
+{% block header_title %}My Profile{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 600px; margin: 0 auto; padding: 2.5rem;">
+    <div style="text-align: center; margin-bottom: 2.5rem;">
+        {% if user.profile_pic %}
+            <img src="{{ user.profile_pic.url }}" alt="Profile" style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 4px solid var(--primary-light); margin-bottom: 1.5rem;">
+        {% else %}
+            <div style="width: 120px; height: 120px; border-radius: 50%; background: var(--primary-light); color: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 3rem; font-weight: 800; border: 4px solid var(--primary-light); margin: 0 auto 1.5rem;">{{ user.first_name.0 }}</div>
+        {% endif %}
+        <h2 style="font-size: 1.5rem; font-weight: 700;">{{ user.first_name }} {{ user.last_name }}</h2>
+        <p style="color: var(--text-muted); font-size: 0.875rem;">@{{ user.username }} | {{ user.email }}</p>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="form-group">
+            <label class="form-label">First Name</label>
+            <input type="text" class="form-control" value="{{ user.first_name }}" disabled>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Last Name</label>
+            <input type="text" class="form-control" value="{{ user.last_name }}" disabled>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Mobile Number</label>
+            <input type="text" name="mobile" class="form-control" value="{{ user.mobile|default:'' }}" placeholder="+91 1234567890">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Profile Picture</label>
+            <input type="file" name="profile_pic" class="form-control" accept="image/*">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%;">Update Profile</button>
+    </form>
+</div>
+{% endblock %}

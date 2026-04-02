@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Aptitude Test Management{% endblock %}</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+    <div class="dashboard-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <i data-lucide="brain-circuit"></i>
+                <span>AptiPro</span>
+            </div>
+            <nav class="sidebar-nav">
+                <ul>
+                    {% if user.is_superuser or user.is_staff %}
+                    <!-- Admin Navigation -->
+                    <li><a href="{% url 'admin_dashboard' %}"
+                            class="nav-link {% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}"><i
+                                data-lucide="layout-dashboard"></i> <span>Dashboard</span></a></li>
+                    <li><a href="{% url 'student_management' %}"
+                            class="nav-link {% if request.resolver_match.url_name == 'student_management' %}active{% endif %}"><i
+                                data-lucide="users"></i> <span>Students</span></a></li>
+                    <li><a href="{% url 'course_management' %}"
+                            class="nav-link {% if request.resolver_match.url_name == 'course_management' or request.resolver_match.url_name == 'view_course_questions' %}active{% endif %}"><i
+                                data-lucide="help-circle"></i> <span>Manage Questions</span></a></li>
+                    <li><a href="{% url 'admin_results' %}"
+                            class="nav-link {% if request.resolver_match.url_name == 'admin_results' %}active{% endif %}"><i
+                                data-lucide="bar-chart-2"></i> <span>Results</span></a></li>
+                    <li><a href="{% url 'certificate_management' %}"
+                            class="nav-link {% if request.resolver_match.url_name == 'certificate_management' %}active{% endif %}"><i
+                                data-lucide="award"></i> <span>Certificates</span></a></li>
+                    {% else %}
+                    <!-- Student Navigation -->
+                    <li><a href="{% url 'student_dashboard' %}"
+                            class="nav-link {% if request.resolver_match.url_name == 'student_dashboard' %}active{% endif %}"><i
+                                data-lucide="layout-dashboard"></i> <span>Dashboard</span></a></li>
+                    <li><a href="{% url 'available_exams' %}"
+                            class="nav-link {% if request.resolver_match.url_name == 'available_exams' %}active{% endif %}"><i
+                                data-lucide="clipboard-list"></i> <span>Exams</span></a></li>
+                    <li><a href="{% url 'student_results' %}"
+                            class="nav-link {% if request.resolver_match.url_name == 'student_results' %}active{% endif %}"><i
+                                data-lucide="check-circle"></i> <span>Results</span></a></li>
+                    <li><a href="{% url 'student_certificates' %}"
+                            class="nav-link {% if request.resolver_match.url_name == 'student_certificates' %}active{% endif %}"><i
+                                data-lucide="award"></i> <span>Certificates</span></a></li>
+                    <li><a href="{% url 'profile' %}"
+                            class="nav-link {% if request.resolver_match.url_name == 'profile' %}active{% endif %}"><i
+                                data-lucide="user"></i> <span>Profile</span></a></li>
+                    {% endif %}
+                    <li><a href="{% url 'logout' %}" class="nav-link mt-4" style="color: var(--danger);"><i
+                                data-lucide="log-out"></i> <span>Logout</span></a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="flex justify-between items-center mb-4">
+                <div class="flex items-center gap-4">
+                    <button id="sidebar-toggle" class="sidebar-toggle-btn" aria-label="Toggle Sidebar">
+                        <i data-lucide="menu"></i>
+                    </button>
+                    <h1 style="font-size: 1.5rem; font-weight: 700;">{% block header_title %}Dashboard{% endblock %}
+                    </h1>
+                </div>
+                <div class="user-profile flex items-center gap-2">
+                    <span style="font-weight: 500;">{{ user.first_name }} {{ user.last_name }}</span>
+                    {% if user.profile_pic %}
+                    <img src="{{ user.profile_pic.url }}" alt="Profile"
+                        style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+                    {% else %}
+                    <div
+                        style="width: 40px; height: 40px; border-radius: 50%; background: var(--primary-light); color: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 700;">
+                        {{ user.first_name.0 }}</div>
+                    {% endif %}
+                </div>
+            </header>
+
+            {% if messages %}
+            <div class="messages mb-4">
+                {% for message in messages %}
+                <div class="card"
+                    style="padding: 1rem; margin-bottom: 0.5rem; border-left: 4px solid {% if message.tags == 'success' %}var(--success){% elif message.tags == 'error' %}var(--danger){% else %}var(--warning){% endif %}; background: {% if message.tags == 'success' %}var(--success-light){% elif message.tags == 'error' %}var(--danger-light){% else %}var(--warning-light){% endif %};">
+                    {{ message }}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        // Sidebar Persistence & Toggle Logic
+        const sidebar = document.querySelector('.sidebar');
+        const sidebarToggle = document.getElementById('sidebar-toggle');
+        const mainContent = document.querySelector('.main-content');
+        
+        const isMobile = () => window.innerWidth <= 768;
+
+        function updateSidebarIcon(isCollapsed) {
+            if (!sidebarToggle) return;
+            const icon = sidebarToggle.querySelector('i');
+            if (isMobile()) {
+                // On mobile, if sidebar is active (open), show X, else MENU
+                const isActive = sidebar.classList.contains('active');
+                icon.setAttribute('data-lucide', isActive ? 'x' : 'menu');
+            } else {
+                // On desktop, if collapsed (mini), keep MENU or show MENU
+                // Usually on desktop the icon stays as hamburger to expand
+                icon.setAttribute('data-lucide', 'menu');
+            }
+            lucide.createIcons();
+        }
+
+        function updateSidebar() {
+            const state = localStorage.getItem('sidebar-state');
+            
+            if (isMobile()) {
+                if (state === 'open') {
+                    sidebar.classList.add('active');
+                } else {
+                    sidebar.classList.remove('active');
+                }
+                sidebar.classList.remove('collapsed');
+                mainContent.classList.remove('sidebar-collapsed');
+            } else {
+                if (state === 'collapsed') {
+                    sidebar.classList.add('collapsed');
+                    mainContent.classList.add('sidebar-collapsed');
+                } else {
+                    sidebar.classList.remove('collapsed');
+                    mainContent.classList.remove('sidebar-collapsed');
+                }
+                sidebar.classList.remove('active');
+            }
+            updateSidebarIcon();
+        }
+
+        updateSidebar();
+
+        if (sidebarToggle) {
+            sidebarToggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (isMobile()) {
+                    const isOpen = sidebar.classList.toggle('active');
+                    localStorage.setItem('sidebar-state', isOpen ? 'open' : 'closed');
+                } else {
+                    const isCollapsed = sidebar.classList.toggle('collapsed');
+                    mainContent.classList.toggle('sidebar-collapsed');
+                    localStorage.setItem('sidebar-state', isCollapsed ? 'collapsed' : 'expanded');
+                }
+                updateSidebarIcon();
+            });
+        }
+
+        window.addEventListener('resize', updateSidebar);
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+
+</html>

@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+
+{% block header_title %}Available Exams{% endblock %}
+
+{% block content %}
+<div class="stats-grid">
+    {% for course in courses %}
+    <div class="card flex flex-col justify-between">
+        <div>
+            <div class="flex justify-between items-center mb-2">
+                <span class="badge badge-pending" style="font-size: 0.625rem; background: var(--primary-light); color: var(--primary);">{{ course.course_id }}</span>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">{{ course.created_at|date:"M d, Y" }}</span>
+            </div>
+            <h3 class="mb-2" style="font-size: 1.125rem; font-weight: 700;">{{ course.name }}</h3>
+            <p class="mb-4" style="font-size: 0.875rem; color: var(--text-muted);">{{ course.description|truncatewords:20 }}</p>
+            
+            <div class="flex gap-4 mb-4" style="font-size: 0.8125rem;">
+                <div class="flex items-center gap-1" style="color: var(--text-muted);">
+                    <i data-lucide="help-circle" style="width: 14px;"></i>
+                    <span>{{ course.num_questions }} Questions</span>
+                </div>
+                <div class="flex items-center gap-1" style="color: var(--text-muted);">
+                    <i data-lucide="bar-chart" style="width: 14px;"></i>
+                    <span>{{ course.total_marks }} Marks</span>
+                </div>
+            </div>
+        </div>
+        <a href="{% url 'take_exam' course.id %}" class="btn btn-primary" style="width: 100%;">Start Exam</a>
+    </div>
+    {% empty %}
+    <div class="card" style="grid-column: 1 / -1; padding: 3rem; text-align: center;">
+        <i data-lucide="book-open" style="width: 48px; height: 48px; color: var(--border); margin-bottom: 1rem;"></i>
+        <p style="color: var(--text-muted); font-size: 1.125rem;">No exams available right now. Please check back later.</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

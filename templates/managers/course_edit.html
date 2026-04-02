@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+
+{% block header_title %}Edit Course{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper" style="min-height: auto; padding: 2rem 0;">
+    <div class="card" style="max-width: 600px; width: 100%; margin: 0 auto; opacity: 1;">
+        <h3 class="mb-4" style="font-size: 1.125rem; font-weight: 700;">Update Course Details</h3>
+        <form method="POST">
+            {% csrf_token %}
+            <div class="form-group">
+                <label class="form-label">Course Name</label>
+                <input type="text" name="name" class="form-control" value="{{ course.name }}" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Description</label>
+                <textarea name="description" class="form-control" rows="6">{{ course.description }}</textarea>
+            </div>
+            
+            <div class="stats-grid mb-4" style="grid-template-columns: 1fr 1fr; margin-bottom: 1.5rem;">
+                <div class="p-3" style="background: var(--success-light); border-radius: 0.5rem; text-align: center;">
+                    <p style="font-size: 0.75rem; color: var(--success); font-weight: 600; text-transform: uppercase;">Total Questions</p>
+                    <p style="font-size: 1.25rem; font-weight: 700;">{{ course.num_questions }}</p>
+                </div>
+                <div class="p-3" style="background: var(--warning-light); border-radius: 0.5rem; text-align: center;">
+                    <p style="font-size: 0.75rem; color: var(--warning); font-weight: 600; text-transform: uppercase;">Total Marks</p>
+                    <p style="font-size: 1.25rem; font-weight: 700;">{{ course.total_marks }}</p>
+                </div>
+            </div>
+
+            <div class="flex gap-2">
+                <a href="{% url 'course_management' %}" class="btn btn-outline" style="flex: 1;">Cancel</a>
+                <button type="submit" class="btn btn-primary" style="flex: 2;">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

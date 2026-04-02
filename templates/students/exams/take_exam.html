@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+
+{% block header_title %}{{ course.name }} Exam{% endblock %}
+
+{% block content %}
+<div class="card" style="padding: 2.5rem; max-width: 800px; margin: 0 auto;">
+    <div id="exam-timer" class="mb-4 text-center" style="font-size: 1.25rem; font-weight: 700; color: var(--primary);">
+        Progress: <span id="current-q-index">1</span> / {{ questions.count }}
+    </div>
+    
+    <div class="progress-bar mb-4" style="height: 6px; background: var(--background); border-radius: 3px; overflow: hidden;">
+        <div id="progress" style="width: 0%; height: 100%; background: var(--primary); transition: width 0.3s ease;"></div>
+    </div>
+
+    <form method="POST" id="exam-form">
+        {% csrf_token %}
+        {% for q in questions %}
+        <div class="question-container {% if not forloop.first %}hidden{% endif %}" id="q-{{ forloop.counter0 }}">
+            <h3 class="mb-4" style="font-size: 1.25rem;">{{ forloop.counter }}. {{ q.text }}</h3>
+            
+            <div class="options-list flex flex-col gap-2">
+                <label class="btn btn-outline flex items-center gap-4" style="justify-content: flex-start; padding: 1rem; border-radius: 0.75rem;">
+                    <input type="radio" name="q_{{ q.id }}" value="1" required style="width: 20px; height: 20px;">
+                    <span>A. {{ q.option1 }}</span>
+                </label>
+                <label class="btn btn-outline flex items-center gap-4" style="justify-content: flex-start; padding: 1rem; border-radius: 0.75rem;">
+                    <input type="radio" name="q_{{ q.id }}" value="2" required style="width: 20px; height: 20px;">
+                    <span>B. {{ q.option2 }}</span>
+                </label>
+                <label class="btn btn-outline flex items-center gap-4" style="justify-content: flex-start; padding: 1rem; border-radius: 0.75rem;">
+                    <input type="radio" name="q_{{ q.id }}" value="3" required style="width: 20px; height: 20px;">
+                    <span>C. {{ q.option3 }}</span>
+                </label>
+                <label class="btn btn-outline flex items-center gap-4" style="justify-content: flex-start; padding: 1rem; border-radius: 0.75rem;">
+                    <input type="radio" name="q_{{ q.id }}" value="4" required style="width: 20px; height: 20px;">
+                    <span>D. {{ q.option4 }}</span>
+                </label>
+            </div>
+            
+            <p class="mt-4" style="color: var(--text-muted); font-size: 0.75rem; text-align: right;">{{ q.marks }} Marks</p>
+        </div>
+        {% endfor %}
+
+        <div class="mt-4 flex justify-between gap-4">
+            <button type="button" class="btn btn-outline" id="prev-btn" style="visibility: hidden;">Previous</button>
+            <button type="button" class="btn btn-primary" id="next-btn" style="width: 150px;">Next</button>
+            <button type="submit" class="btn btn-success" id="submit-btn" style="display: none; width: 150px;">Submit Exam</button>
+        </div>
+    </form>
+</div>
+
+<style>
+    .hidden { display: none; }
+    .options-list label:has(input:checked) {
+        border-color: var(--primary);
+        background-color: var(--primary-light);
+        color: var(--primary);
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentIndex = 0;
+    const totalQuestions = {{ questions.count }};
+    const nextBtn = document.getElementById('next-btn');
+    const prevBtn = document.getElementById('prev-btn');
+    const submitBtn = document.getElementById('submit-btn');
+    const indexSpan = document.getElementById('current-q-index');
+    const progressBar = document.getElementById('progress');
+
+    function updateView() {
+        document.querySelectorAll('.question-container').forEach((q, idx) => {
+            q.classList.toggle('hidden', idx !== currentIndex);
+        });
+        
+        indexSpan.textContent = currentIndex + 1;
+        progressBar.style.width = ((currentIndex + 1) / totalQuestions * 100) + '%';
+        
+        prevBtn.style.visibility = currentIndex === 0 ? 'hidden' : 'visible';
+        
+        if (currentIndex === totalQuestions - 1) {
+            nextBtn.style.display = 'none';
+            submitBtn.style.display = 'flex';
+        } else {
+            nextBtn.style.display = 'flex';
+            submitBtn.style.display = 'none';
+        }
+    }
+
+    nextBtn.addEventListener('click', () => {
+        const currentQ = document.getElementById(`q-${currentIndex}`);
+        const checked = currentQ.querySelector('input:checked');
+        if (!checked) {
+            alert('Please select an answer!');
+            return;
+        }
+        if (currentIndex < totalQuestions - 1) {
+            currentIndex++;
+            updateView();
+        }
+    });
+
+    prevBtn.addEventListener('click', () => {
+        if (currentIndex > 0) {
+            currentIndex--;
+            updateView();
+        }
+    });
+
+    updateView();
+</script>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block header_title %}My Certificates{% endblock %}
+
+{% block content %}
+<div class="stats-grid">
+    {% for cert in certificates %}
+    <div class="card" style="padding: 1rem;">
+        <div style="background: var(--primary-light); color: var(--primary); width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 1rem;">
+            <i data-lucide="award"></i>
+        </div>
+        <h3 style="font-size: 1.125rem; font-weight: 700; margin-bottom: 0.5rem;">{{ cert.result.course.name }}</h3>
+        <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1rem;">ID: {{ cert.certificate_id }} | Issued: {{ cert.issued_at|date:"d M Y" }}</p>
+        
+        <div class="flex justify-between items-center mt-4">
+            <span class="badge badge-success" style="font-size: 0.75rem;">{{ cert.result.percentage|floatformat:1 }}% Score</span>
+            <div class="flex gap-2">
+                <a href="{{ cert.qr_code.url }}" target="_blank" class="btn btn-outline" style="padding: 0.5rem;"><i data-lucide="maximize" style="width: 16px;"></i></a>
+                <a href="{{ cert.qr_code.url }}" download class="btn btn-primary" style="padding: 0.5rem;"><i data-lucide="download" style="width: 16px;"></i></a>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="card" style="grid-column: 1 / -1; padding: 4rem; text-align: center;">
+        <i data-lucide="award" style="width: 64px; height: 64px; color: var(--border); margin-bottom: 1.5rem;"></i>
+        <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--text-main);">No Certificates Earned</h2>
+        <p style="color: var(--text-muted); font-size: 1rem; margin-top: 0.5rem;">Complete an exam with 60% or more to earn your certificate.</p>
+        <a href="{% url 'available_exams' %}" class="btn btn-primary mt-4">Take an Exam</a>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

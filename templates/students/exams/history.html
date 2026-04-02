@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block header_title %}My Exam History{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Course</th>
+                    <th>Score</th>
+                    <th>Percentage</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for res in results %}
+                <tr>
+                    <td>{{ res.attempt_date|date:"d M Y, H:i" }}</td>
+                    <td style="font-weight: 600;">{{ res.course.name }}</td>
+                    <td>{{ res.score|floatformat:1 }} / {{ res.total_marks }}</td>
+                    <td>{{ res.percentage|floatformat:1 }}%</td>
+                    <td>
+                        {% if res.pass_status %}
+                            <span class="badge badge-success">Passed</span>
+                        {% else %}
+                            <span class="badge badge-danger">Failed</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'view_result' res.id %}" class="btn btn-outline" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Details</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" style="padding: 2rem; text-align: center; color: var(--text-muted);">No attempts yet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends 'auth_base.html' %}
+
+{% block title %}Login - AptiPro{% endblock %}
+
+{% block content %}
+<h2 class="mb-4" style="font-weight: 700;">Welcome Back</h2>
+<form method="POST">
+    {% csrf_token %}
+    <div class="form-group">
+        <label class="form-label">Email or Username</label>
+        <input type="text" name="identifier" class="form-control" placeholder="john@example.com" required>
+    </div>
+    <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" name="password" class="form-control" placeholder="••••••••" required>
+    </div>
+    <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.75rem;">Login to Dashboard</button>
+</form>
+<p class="mt-4 text-center" style="font-size: 0.875rem; color: var(--text-muted);">
+    Don't have an account? <a href="{% url 'register' %}" style="color: var(--primary); font-weight: 600;">Register Now</a>
+</p>
+<hr class="mt-4 mb-4" style="border: 0; border-top: 1px solid var(--border);">
+<p class="text-center" style="font-size: 0.75rem; color: var(--text-muted);">
+    Registered as Admin? <a href="{% url 'admin_dashboard' %}" style="color: var(--primary); font-weight: 600;">Go to Admin Portal</a>
+</p>
+{% endblock %}
