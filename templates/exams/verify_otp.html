@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Verify OTP - Aptipro{% endblock %}
+{% block page_title %}Security Verification{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+
+{% block content %}
+<div class="auth-card" style="max-width: 400px; margin: 0 auto; padding: 40px; background: #fff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+  <div style="text-align: center; margin-bottom: 32px;">
+    <div style="margin-bottom: 16px;">
+      <img src="{% static 'images/logo.png' %}" alt="Aptipro Logo" style="height: 64px; width: auto;">
+    </div>
+    <h1 style="font-size: 28px; font-weight: 800; color: var(--accent-primary); margin-bottom: 8px;">Aptipro</h1>
+    <h2 style="font-size: 20px; font-weight: 700; color: var(--text-primary);">Verify OTP</h2>
+    <p style="color: var(--text-muted); font-size: 14px;">We've sent a 6-digit code to your email.</p>
+  </div>
+  
+  <form method="POST">
+    {% csrf_token %}
+    
+    <div class="form-group" style="margin-bottom: 24px; text-align: center;">
+      <label class="label" style="display: block; margin-bottom: 12px; font-weight: 600;">One-Time Password</label>
+      <div style="display: flex; justify-content: center;">
+          {{ form.code }}
+      </div>
+      {% if form.code.errors %}
+        <div style="color: var(--accent-danger); font-size: 12px; margin-top: 8px;">{{ form.code.errors.0 }}</div>
+      {% endif %}
+    </div>
+
+    <button type="submit" class="btn btn-primary" style="width: 100%; height: 48px; font-size: 16px; border-radius: 8px; border: none; background: var(--accent-primary); color: white; cursor: pointer;">
+      Verify Code
+    </button>
+  </form>
+  
+  <div style="text-align: center; margin-top: 32px; font-size: 14px; color: var(--text-secondary);">
+    Didn't receive the email? <a href="{% url 'forgot_password' %}" style="font-weight: 700; color: var(--accent-primary);">Resend OTP</a>
+  </div>
+</div>
+{% endblock %}

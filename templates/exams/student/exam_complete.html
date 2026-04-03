@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}Test Completed — Exam Platform{% endblock %}
+{% block title %}Test Completed — Aptipro{% endblock %}
 
 {% block content %}
 <div class="card" style="max-width: 600px; margin: 40px auto; text-align: center; padding: 60px 40px;">
@@ -17,4 +17,18 @@
         <a href="{% url 'student_history' %}" class="btn btn-outline" style="padding: 12px 32px;">View My History</a>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Prevent Back Navigation from completion page back to the test
+    (function() {
+        if (window.history.pushState) {
+            window.history.pushState(null, document.title, window.location.href);
+            window.addEventListener('popstate', function() {
+                window.history.pushState(null, document.title, window.location.href);
+            });
+        }
+    })();
+</script>
 {% endblock %}

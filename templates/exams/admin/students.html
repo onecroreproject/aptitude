@@ -60,7 +60,13 @@
                         {% endif %}
                     </td>
                     <td>
-                        <a href="{% url 'admin_student_detail' s.id %}" class="btn btn-primary btn-sm">View Profile</a>
+                        <div style="display: flex; gap: 8px;">
+                            <a href="{% url 'admin_student_detail' s.id %}" class="btn-action btn-view" title="View Profile">👁️</a>
+                            <form action="{% url 'admin_delete_student' s.id %}" method="POST" onsubmit="return confirm('Permanently remove this student? All history will be deleted.');" style="display:inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn-action btn-delete" title="Delete Student">🗑️</button>
+                            </form>
+                        </div>
                     </td>
                 </tr>
                 {% empty %}

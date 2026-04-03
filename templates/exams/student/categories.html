@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Exam Categories - ExamPlatform{% endblock %}
+{% block title %}Exam Categories - Aptipro{% endblock %}
 {% block page_title %}Available Exam Categories{% endblock %}
 
 {% block content %}
@@ -26,24 +26,24 @@
       
       <div style="display: flex; align-items: center; justify-content: space-between; margin-top: auto;">
         <span style="font-size: 12px; font-weight: 700; color: var(--text-muted);">
-          {{ category.q_count }} QUESTIONS
+          {{ category.q_count|default:0 }} QUESTIONS
         </span>
         
         {% if category.id in pending_cat_ids %}
           <span class="badge badge-pending">PENDING APPROVAL</span>
         {% else %}
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            {% if category.id in approved_cat_ids %}
-              <a href="{% url 'student_dashboard' %}" class="btn btn-success btn-sm">Start Exam</a>
+            {% if category.paper_id %}
+                <a href="{% url 'take_exam' category.paper_id %}" class="btn btn-success" style="flex: 1;">Start Exam</a>
+            {% else %}
+              <form action="{% url 'request_exam' %}" method="POST" style="flex: 1; display: flex;">
+                {% csrf_token %}
+                <input type="hidden" name="category" value="{{ category.id }}">
+                <button type="submit" class="btn {% if category.id in failed_cat_ids %}btn-warning{% elif category.id in completed_cat_ids %}btn-ghost{% else %}btn-primary{% endif %}" style="width: 100%;">
+                  {% if category.id in completed_cat_ids or category.id in failed_cat_ids %}Request Retest{% else %}Request Exam{% endif %}
+                </button>
+              </form>
             {% endif %}
-            
-            <form action="{% url 'request_exam' %}" method="POST">
-              {% csrf_token %}
-              <input type="hidden" name="category" value="{{ category.id }}">
-              <button type="submit" class="btn {% if category.id in failed_cat_ids %}btn-warning{% elif category.id in completed_cat_ids %}btn-ghost{% else %}btn-primary{% endif %} btn-sm">
-                {% if category.id in completed_cat_ids or category.id in failed_cat_ids %}Request Retest{% else %}Request Exam{% endif %}
-              </button>
-            </form>
           </div>
         {% endif %}
       </div>

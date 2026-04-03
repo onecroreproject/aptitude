@@ -108,13 +108,19 @@ class StudentRegistrationForm(UserCreationForm):
         user.role = CustomUser.Role.STUDENT
         user.is_staff = False
         user.is_superuser = False
+        
+        # Explicitly ensure profile fields are captured
+        user.phone_number = self.cleaned_data.get('phone_number')
+        user.whatsapp_number = self.cleaned_data.get('whatsapp_number')
+        user.institution = self.cleaned_data.get('institution')
+        
         if commit:
             user.save()
         return user
 
 
 class CustomLoginForm(AuthenticationForm):
-    """Styled login form for the exam platform."""
+    """Styled login form for the Aptipro platform."""
 
     username = forms.CharField(
         widget=forms.TextInput(attrs={
@@ -130,6 +136,73 @@ class CustomLoginForm(AuthenticationForm):
             'autocomplete': 'current-password',
         }),
     )
+
+
+class ForgotPasswordForm(forms.Form):
+    """Form for requesting a password reset OTP."""
+    email = forms.EmailField(
+        widget=forms.EmailInput(attrs={
+            'class': 'form-input',
+            'placeholder': 'Enter your registered email',
+            'autocomplete': 'email',
+        }),
+    )
+
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        if not CustomUser.objects.filter(email=email).exists():
+            raise ValidationError("No user found with this email address.")
+        return email
+
+
+class OTPVerificationForm(forms.Form):
+    """Form specifically for verifying the 6-digit OTP."""
+    code = forms.CharField(
+        max_length=6,
+        min_length=6,
+        widget=forms.TextInput(attrs={
+            'class': 'form-input',
+            'placeholder': 'Enter 6-digit OTP',
+            'style': 'text-align: center; letter-spacing: 0.5em; font-weight: 700;',
+        }),
+    )
+
+    def clean_code(self):
+        code = self.cleaned_data.get('code')
+        if not code.isdigit():
+            raise ValidationError("OTP must be digits only.")
+        return code
+
+
+class ResetPasswordForm(forms.Form):
+    """Form for setting a new password after OTP verification."""
+    password = forms.CharField(
+        label="New Password",
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-input',
+            'placeholder': 'New Password',
+        }),
+    )
+    confirm_password = forms.CharField(
+        label="Confirm New Password",
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-input',
+            'placeholder': 'Confirm Password',
+        }),
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        password = cleaned_data.get("password")
+        confirm_password = cleaned_data.get("confirm_password")
+
+        if password and confirm_password and password != confirm_password:
+            raise ValidationError("Passwords do not match.")
+        
+        if password and len(password) < 8:
+             raise ValidationError("Password must be at least 8 characters.")
+
+        return cleaned_data
 
 
 # ──────────────────────────────────────────────

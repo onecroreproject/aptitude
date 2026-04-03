@@ -1,21 +1,25 @@
 {% extends 'base.html' %}
-{% block title %}Exam — Exam Platform{% endblock %}
+{% block title %}Exam — Aptipro{% endblock %}
+{% block extra_css %}
+<style>
+    .content-body { padding: 0 !important; }
+    .main-content { background: var(--bg-primary); }
+</style>
+{% endblock %}
 
 {% block content %}
-<div style="min-height: calc(100vh - 100px); background:var(--bg-primary);">
+<div style="height: calc(100vh - 100px); background:var(--bg-primary); display: flex; flex-direction: column; overflow: hidden;">
     <!-- Exam Header -->
-    <div class="exam-header" style="margin:16px; position:sticky; top:0; z-index:100; display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: var(--bg-secondary); border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid var(--border-color);">
+    <div class="exam-header" style="margin: 0 0 12px 0; padding: 10px 20px;">
         <div>
-            <h2 style="font-size:18px; font-weight:700; margin: 0;">📝 {{ paper.category.name }} Exam</h2>
-            <p style="color:var(--text-secondary); font-size:13px; margin: 4px 0 0;">
+            <h2 style="font-size: 18px; font-weight: 800; margin: 0; color: var(--accent-primary);">🎯 {{ paper.category.name }}</h2>
+            <p style="color:var(--text-muted); font-size: 11px; margin-top: 2px; font-weight: 600; text-transform: uppercase;">
                 Question <span id="current-q-num">1</span> of {{ questions|length }}
             </p>
         </div>
         <div style="text-align: right;">
-            <div id="q-timer-container" style="font-size: 24px; font-weight: 700; font-family: monospace; color: var(--accent-primary);">
-                00:00
-            </div>
-            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Question Timer</div>
+            <div id="q-timer-container" style="font-size: 20px; font-weight: 700; font-family: monospace; color: var(--accent-primary);">00:00</div>
+            <div style="font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; font-weight: 700;">Question Timer</div>
         </div>
     </div>
 
@@ -28,47 +32,46 @@
     {% endif %}
 
     <!-- Questions Form -->
-    <form method="post" id="exam-form" style="padding:0 16px 100px;">
+    <form method="post" id="exam-form" style="flex: 1; overflow-y: auto; padding-bottom: 20px;">
         {% csrf_token %}
 
         {% for pq in questions %}
-        <div class="question-card fade-in" id="q-card-{{ forloop.counter0 }}" style="display: {% if forloop.first %}block{% else %}none{% endif %};">
-            <div class="question-meta" style="margin-bottom: 20px; display: flex; gap: 12px; align-items: center;">
-                <span class="badge badge-info">📊 {{ pq.question.marks }} marks</span>
-                <span class="badge badge-warning">⏱️ {{ pq.question.time_limit_minutes }} min limit</span>
-                <span class="difficulty-badge {% if pq.question.difficulty == 'Easy' %}easy{% elif pq.question.difficulty == 'Medium' %}medium{% else %}hard{% endif %}">
+        <div class="question-card fade-in" id="q-card-{{ forloop.counter0 }}" style="display: {% if forloop.first %}block{% else %}none{% endif %}; padding: 24px; margin-top: 0;">
+            <div class="question-meta" style="margin-bottom: 16px; display: flex; gap: 12px; align-items: center;">
+                <span class="badge badge-info" style="background: var(--accent-primary-light); color: var(--accent-primary); padding: 2px 8px; font-size: 10px;">📊 {{ pq.question.marks }} Marks</span>
+                <span class="difficulty-badge {% if pq.question.difficulty == 'Easy' %}easy{% elif pq.question.difficulty == 'Medium' %}medium{% else %}hard{% endif %}" style="padding: 2px 8px; font-size: 10px;">
                     {{ pq.question.difficulty }}
                 </span>
             </div>
             
-            <div class="question-text" style="font-size: 1.25rem; font-weight: 600; line-height: 1.6; color: var(--text-primary); margin-bottom: 24px;">
+            <div class="question-text" style="font-size: 1.2rem; font-weight: 700; line-height: 1.3; color: var(--text-primary); margin-bottom: 20px;">
                 {{ pq.question.question_text }}
             </div>
 
             {% if pq.question.question_type == 'MCQ' or pq.question.question_type == 'True/False' %}
-            <div class="options-list" style="display: grid; gap: 12px;">
+            <div class="options-list" style="display: grid; gap: 8px;">
                 {% if pq.question.option_a %}
-                <label class="option-item">
+                <label class="option-item" style="padding: 12px 16px;">
                     <input type="radio" name="answer_{{ pq.question.id }}" value="A">
-                    <span><strong>A.</strong> {{ pq.question.option_a }}</span>
+                    <span style="font-size: 14px;"><strong>A.</strong> {{ pq.question.option_a }}</span>
                 </label>
                 {% endif %}
                 {% if pq.question.option_b %}
-                <label class="option-item">
+                <label class="option-item" style="padding: 12px 16px;">
                     <input type="radio" name="answer_{{ pq.question.id }}" value="B">
-                    <span><strong>B.</strong> {{ pq.question.option_b }}</span>
+                    <span style="font-size: 14px;"><strong>B.</strong> {{ pq.question.option_b }}</span>
                 </label>
                 {% endif %}
                 {% if pq.question.option_c %}
-                <label class="option-item">
+                <label class="option-item" style="padding: 12px 16px;">
                     <input type="radio" name="answer_{{ pq.question.id }}" value="C">
-                    <span><strong>C.</strong> {{ pq.question.option_c }}</span>
+                    <span style="font-size: 14px;"><strong>C.</strong> {{ pq.question.option_c }}</span>
                 </label>
                 {% endif %}
                 {% if pq.question.option_d %}
-                <label class="option-item">
+                <label class="option-item" style="padding: 12px 16px;">
                     <input type="radio" name="answer_{{ pq.question.id }}" value="D">
-                    <span><strong>D.</strong> {{ pq.question.option_d }}</span>
+                    <span style="font-size: 14px;"><strong>D.</strong> {{ pq.question.option_d }}</span>
                 </label>
                 {% endif %}
             </div>
@@ -85,13 +88,13 @@
         {% endfor %}
 
         <!-- Navigation Buttons (sticky bottom) -->
-        <div style="position:fixed; bottom:0; left:0; right:0; padding:16px 20px; background:var(--bg-secondary); border-top:1px solid var(--border-color); z-index:100; display:flex; justify-content:space-between; align-items:center;">
-            <div style="color:var(--text-secondary); font-size:14px;">
+        <div class="exam-footer">
+            <div style="color:var(--text-secondary); font-size:12px;">
                 <span id="progress-text">Progress: 1 / {{ questions|length }}</span>
             </div>
             <div>
-                <button type="button" class="btn btn-primary" id="next-btn" style="padding: 10px 24px; font-weight: 600;">Next Question ➡</button>
-                <button type="submit" class="btn btn-success" id="submit-btn" style="display: none; padding: 10px 24px; font-weight: 600;" onclick="return confirm('Are you sure you want to submit your exam?')">Submit Final Paper ✅</button>
+                <button type="button" class="btn btn-primary" id="next-btn" style="padding: 8px 20px; font-weight: 600;">Next Question ➡</button>
+                <button type="submit" class="btn btn-success" id="submit-btn" style="display: none; padding: 8px 20px; font-weight: 600;" onclick="return confirm('Are you sure you want to submit your exam?')">Submit Final Paper ✅</button>
             </div>
         </div>
     </form>
@@ -174,6 +177,31 @@
     }
 
     nextBtn.addEventListener('click', moveToNext);
+    
+    // Prevent Back Navigation
+    (function (window, location) {
+        history.replaceState(null, document.title, location.pathname + "#!/steer");
+        history.pushState(null, document.title, location.pathname);
+
+        window.addEventListener("popstate", function () {
+            if (location.hash === "#!/steer") {
+                history.replaceState(null, document.title, location.pathname);
+                setTimeout(function () {
+                    location.replace(location.pathname);
+                }, 0);
+            }
+        }, false);
+    }(window, location));
+
+    // Warn before leave
+    window.onbeforeunload = function() {
+        return "Are you sure you want to leave? Your exam progress will be lost.";
+    };
+
+    // Remove warning on submit
+    form.addEventListener('submit', () => {
+        window.onbeforeunload = null;
+    });
 
     // Initial start
     if (questions.length > 0) {

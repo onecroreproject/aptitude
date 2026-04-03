@@ -19,23 +19,36 @@
           <th>Description</th>
           <th>Questions</th>
           <th>Created At</th>
-          <th>Actions</th>
+          <th>⚙️ Actions</th>
         </tr>
       </thead>
       <tbody>
         {% for category in categories %}
           <tr>
-            <td style="font-weight: 700;">{{ category.name }}</td>
-            <td style="font-size: 13px; color: var(--text-secondary);">{{ category.description|truncatewords:10 }}</td>
-            <td><span class="badge badge-approved">{{ category.q_count }}</span></td>
-            <td style="font-size: 12px; font-weight: 500;">{{ category.created_at|date:"M d, Y" }}</td>
-            <td>
-              <div style="display: flex; gap: 8px;">
-                <a href="{% url 'admin_category_detail' category.pk %}" class="btn btn-primary btn-sm">View</a>
-                <a href="{% url 'admin_edit_category' category.pk %}" class="btn btn-outline btn-sm">Edit</a>
-                <form action="{% url 'admin_delete_category' category.pk %}" method="POST" onsubmit="return confirm('Delete this category? Only succeeds if no questions/papers are linked.');">
+            <td style="padding: 16px 20px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; min-width: 200px;">
+                <span style="font-weight: 700; color: var(--text-primary); font-size: 15px;">{{ category.name }}</span>
+                <form action="{% url 'admin_toggle_category' category.pk %}" method="POST" style="display: inline; line-height: 1;">
                   {% csrf_token %}
-                  <button type="submit" class="btn btn-outline btn-sm" style="color: var(--accent-danger); border-color: var(--accent-danger);">Delete</button>
+                  <button type="submit" class="btn btn-sm {% if category.is_active %}btn-success{% else %}btn-danger{% endif %}" 
+                          style="padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 6px; min-width: 70px; text-transform: uppercase; border: none; cursor: pointer; transition: all 0.2s;">
+                    {% if category.is_active %}Active{% else %}Inactive{% endif %}
+                  </button>
+                </form>
+              </div>
+            </td>
+            <td style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">{{ category.description|truncatewords:10 }}</td>
+            <td style="text-align: center;">
+              <span class="badge badge-approved" style="padding: 4px 10px; border-radius: 20px;" title="Total Questions">{{ category.q_count }}</span>
+            </td>
+            <td style="font-size: 12px; font-weight: 500; color: var(--text-muted);">{{ category.created_at|date:"M d, Y" }}</td>
+            <td>
+              <div style="display: flex; gap: 12px; align-items: center; justify-content: flex-start;">
+                <a href="{% url 'admin_category_detail' category.pk %}" class="btn-action btn-view" title="View Category Details">👁️</a>
+                <a href="{% url 'admin_edit_category' category.pk %}" class="btn-action btn-edit" title="Edit Category">✏️</a>
+                <form action="{% url 'admin_delete_category' category.pk %}" method="POST" onsubmit="return confirm('Delete this category?');" style="display: inline;">
+                  {% csrf_token %}
+                  <button type="submit" class="btn-action btn-delete" title="Delete Category">🗑️</button>
                 </form>
               </div>
             </td>

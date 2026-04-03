@@ -8,9 +8,11 @@ All student views are gated by StudentRequiredMixin.
 
 import json
 from django.contrib import messages
-from django.contrib.auth import login, logout
+from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.mail import send_mail
+from django.conf import settings
 from django.db.models import Avg, Count, Sum, Q, F
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
@@ -27,6 +29,9 @@ from .forms import (
     ExamRequestForm,
     ExcelImportForm,
     ExamRequestReviewForm,
+    ForgotPasswordForm,
+    OTPVerificationForm,
+    ResetPasswordForm,
 )
 from .mixins import SuperuserRequiredMixin, StudentRequiredMixin
 from .models import (
@@ -39,6 +44,7 @@ from .models import (
     StudentAnswer,
     ExamRequest,
     Notification,
+    OTP,
 )
 from .utils import import_questions_from_excel, generate_exam_paper, submit_and_evaluate
 
@@ -50,9 +56,16 @@ from .utils import import_questions_from_excel, generate_exam_paper, submit_and_
 class RegisterView(View):
     """Student registration — creates user with role=Student."""
 
-    def get(self, request):
+    def dispatch(self, request, *args, **kwargs):
         if request.user.is_authenticated:
-            return redirect('dashboard')
+            return redirect('student_dashboard' if not request.user.is_superuser else 'admin_dashboard')
+        response = super().dispatch(request, *args, **kwargs)
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
+        return response
+
+    def get(self, request):
         form = StudentRegistrationForm()
         return render(request, 'exams/register.html', {'form': form})
 
@@ -69,9 +82,16 @@ class RegisterView(View):
 class LoginView(View):
     """Login view — routes to appropriate dashboard based on role."""
 
-    def get(self, request):
+    def dispatch(self, request, *args, **kwargs):
         if request.user.is_authenticated:
-            return redirect('dashboard')
+            return redirect('student_dashboard' if not request.user.is_superuser else 'admin_dashboard')
+        response = super().dispatch(request, *args, **kwargs)
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
+        return response
+
+    def get(self, request):
         form = CustomLoginForm()
         return render(request, 'exams/login.html', {'form': form})
 
@@ -97,6 +117,124 @@ class LogoutView(View):
     def post(self, request):
         logout(request)
         return redirect('login')
+
+
+class ForgotPasswordView(View):
+    """Initial step: user enters email to receive an OTP."""
+    def get(self, request):
+        form = ForgotPasswordForm()
+        return render(request, 'exams/forgot_password.html', {'form': form})
+
+    def post(self, request):
+        form = ForgotPasswordForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data['email']
+            user = CustomUser.objects.get(email=email)
+            
+            # Generate 6-digit random OTP
+            import random
+            otp_code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+            
+            # Save OTP to DB
+            OTP.objects.create(user=user, code=otp_code)
+            
+            # Send Email
+            subject = f"Your {settings.DEFAULT_FROM_EMAIL.split('@')[0]} Password Reset OTP"
+            # Actually use 'Aptipro' here as requested
+            subject = "Aptipro Password Reset OTP"
+            message = f"Hello {user.username},\n\nYour OTP for resetting your password is: {otp_code}\n\nThis OTP is valid for 10 minutes.\n\nRegards,\nAptipro Team"
+            
+            try:
+                send_mail(
+                    subject,
+                    message,
+                    settings.DEFAULT_FROM_EMAIL,
+                    [email],
+                    fail_silently=False,
+                )
+                messages.success(request, f"An OTP has been sent to {email}.")
+                request.session['reset_email'] = email
+                return redirect('verify_otp')
+            except Exception as e:
+                messages.error(request, f"Failed to send email. Please check your SMTP settings. Error: {str(e)}")
+                
+        return render(request, 'exams/forgot_password.html', {'form': form})
+
+
+class VerifyOTPView(View):
+    """Step 2: user enters the OTP they received."""
+    def get(self, request):
+        if 'reset_email' not in request.session:
+            return redirect('forgot_password')
+        form = OTPVerificationForm()
+        return render(request, 'exams/verify_otp.html', {'form': form})
+
+    def post(self, request):
+        if 'reset_email' not in request.session:
+            return redirect('forgot_password')
+        
+        email = request.session['reset_email']
+        user = get_object_or_404(CustomUser, email=email)
+        form = OTPVerificationForm(request.POST)
+        
+        if form.is_valid():
+            code = form.cleaned_data['code']
+            otp_obj = OTP.objects.filter(user=user, code=code, is_verified=False).last()
+            
+            if otp_obj and not otp_obj.is_expired():
+                otp_obj.is_verified = True
+                otp_obj.save()
+                messages.success(request, "OTP verified successfully. You can now reset your password.")
+                return redirect('reset_password')
+            else:
+                messages.error(request, "Invalid or expired OTP.")
+                
+        return render(request, 'exams/verify_otp.html', {'form': form})
+
+
+class ResetPasswordView(View):
+    """Step 3: user sets a new password."""
+    def get(self, request):
+        if 'reset_email' not in request.session:
+            return redirect('forgot_password')
+        
+        email = request.session['reset_email']
+        user = get_object_or_404(CustomUser, email=email)
+        # Ensure latest OTP is verified
+        otp_obj = OTP.objects.filter(user=user, is_verified=True).last()
+        if not otp_obj:
+            messages.error(request, "Please verify your OTP first.")
+            return redirect('verify_otp')
+
+        form = ResetPasswordForm()
+        return render(request, 'exams/reset_password.html', {'form': form})
+
+    def post(self, request):
+        if 'reset_email' not in request.session:
+            return redirect('forgot_password')
+        
+        email = request.session['reset_email']
+        user = get_object_or_404(CustomUser, email=email)
+        otp_obj = OTP.objects.filter(user=user, is_verified=True).last()
+        if not otp_obj:
+            return redirect('verify_otp')
+
+        form = ResetPasswordForm(request.POST)
+        if form.is_valid():
+            new_password = form.cleaned_data['password']
+            user.set_password(new_password)
+            user.save()
+            
+            # For security, invalidate the session and session hash
+            update_session_auth_hash(request, user)
+            
+            # Clean up session
+            del request.session['reset_email']
+            
+            messages.success(request, "Your password has been reset successfully. You can now log in.")
+            return redirect('login')
+            
+        return render(request, 'exams/reset_password.html', {'form': form})
 
 
 @login_required
@@ -135,7 +273,8 @@ class StudentDashboardView(StudentRequiredMixin, TemplateView):
             student=user
         ).values_list('exam_paper_id', flat=True)
         ctx['available_exams'] = ExamPaper.objects.filter(
-            student=user
+            student=user,
+            category__is_active=True
         ).exclude(id__in=taken_paper_ids)
 
         # Completed exams count (students see only "Test Completed")
@@ -148,6 +287,9 @@ class StudentDashboardView(StudentRequiredMixin, TemplateView):
         ctx['notifications'] = Notification.objects.filter(
             recipient=user
         ).order_by('-created_at')[:10]
+
+        # Active categories for the request modal
+        ctx['active_categories'] = Category.objects.filter(is_active=True).order_by('name')
 
         return ctx
 
@@ -214,7 +356,7 @@ class StudentCategoriesView(StudentRequiredMixin, ListView):
     context_object_name = 'categories'
     
     def get_queryset(self):
-        return Category.objects.annotate(
+        return Category.objects.filter(is_active=True).annotate(
             q_count=Count('questions', filter=Q(questions__is_active=True))
         ).order_by('name')
 
@@ -233,8 +375,14 @@ class StudentCategoriesView(StudentRequiredMixin, ListView):
             student=user
         ).exclude(
             result__status__in=['Submitted', 'Evaluated']
-        ).values_list('category_id', flat=True)
-        ctx['approved_cat_ids'] = list(untaken_papers)
+        ).values('category_id', 'id')
+        
+        # Build a map for easy lookup
+        paper_map = {p['category_id']: p['id'] for p in untaken_papers}
+
+        # Inject paper_id into categories for the template
+        for cat in ctx['categories']:
+            cat.paper_id = paper_map.get(cat.id)
         
         # Categories already attempted (to show "Retest" vs "Request")
         completed_cat_ids = StudentExamResult.objects.filter(
@@ -261,9 +409,12 @@ class TakeExamView(StudentRequiredMixin, View):
     def get(self, request, paper_id):
         paper = get_object_or_404(ExamPaper, id=paper_id, student=request.user)
 
-        # Check if already taken
-        if StudentExamResult.objects.filter(exam_paper=paper).exists():
-            messages.info(request, 'You have already completed this exam.')
+        # Check if already submitted or evaluated
+        if StudentExamResult.objects.filter(
+            exam_paper=paper, 
+            status__in=[StudentExamResult.Status.SUBMITTED, StudentExamResult.Status.EVALUATED]
+        ).exists():
+            messages.warning(request, 'You have already completed this exam.')
             return redirect('student_dashboard')
 
         # Create result record (In Progress)
@@ -277,11 +428,16 @@ class TakeExamView(StudentRequiredMixin, View):
         )
 
         questions = paper.paper_questions.select_related('question').order_by('order')
-        return render(request, 'exams/student/take_exam.html', {
+        response = render(request, 'exams/student/take_exam.html', {
             'paper': paper,
             'questions': questions,
             'result': result,
         })
+        # Prevent caching test questions
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
+        return response
 
     def post(self, request, paper_id):
         paper = get_object_or_404(ExamPaper, id=paper_id, student=request.user)
@@ -321,6 +477,14 @@ class TakeExamView(StudentRequiredMixin, View):
 class ExamCompleteView(StudentRequiredMixin, TemplateView):
     """Shows "Test Completed" message — no scores visible to students."""
     template_name = 'exams/student/exam_complete.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        response = super().dispatch(request, *args, **kwargs)
+        # Prevent back-navigation to the test from here
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
+        return response
 
 
 class StudentHistoryView(StudentRequiredMixin, ListView):
@@ -369,6 +533,46 @@ class MarkAllNotificationsReadView(LoginRequiredMixin, View):
     def post(self, request):
         Notification.mark_all_read(request.user)
         messages.success(request, 'All notifications marked as read.')
+        if request.user.is_superuser:
+            return redirect('admin_notifications')
+        return redirect('student_notifications')
+
+
+class FetchNotificationsView(LoginRequiredMixin, View):
+    """JSON API to fetch latest unread notifications for the dropdown."""
+    def get(self, request):
+        count = Notification.unread_count(request.user)
+        latest = Notification.objects.filter(
+            recipient=request.user, 
+            is_read=False
+        ).order_by('-created_at')[:5]
+        
+        data = {
+            'count': count,
+            'notifications': [
+                {
+                    'id': str(n.id),
+                    'title': n.title,
+                    'message': n.message,
+                    'created_at': n.created_at.strftime('%I:%M %p'),
+                    'type': n.notification_type
+                } for n in latest
+            ]
+        }
+        return JsonResponse(data)
+
+
+class DeleteNotificationView(LoginRequiredMixin, View):
+    """Delete a specific notification."""
+    def post(self, request, notification_id):
+        notif = get_object_or_404(
+            Notification, id=notification_id, recipient=request.user
+        )
+        notif.delete()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'ok'})
+            
+        messages.success(request, 'Notification deleted.')
         if request.user.is_superuser:
             return redirect('admin_notifications')
         return redirect('student_notifications')
@@ -491,6 +695,16 @@ class AdminStudentDetailView(SuperuserRequiredMixin, DetailView):
         ).order_by('-requested_at')
 
         return ctx
+
+
+class AdminDeleteStudentView(SuperuserRequiredMixin, View):
+    """Safely delete a student and all related records (cascade handled by DB)."""
+    def post(self, request, pk):
+        student = get_object_or_404(CustomUser, pk=pk, role='Student')
+        username = student.username
+        student.delete()
+        messages.success(request, f'Student "{username}" has been removed from the platform.')
+        return redirect('admin_students')
 
 
 class AdminQuestionsView(SuperuserRequiredMixin, ListView):
@@ -902,4 +1116,16 @@ class AdminDeleteCategoryView(SuperuserRequiredMixin, View):
         else:
             cat.delete()
             messages.success(request, 'Category deleted successfully.')
+        return redirect('admin_categories')
+
+
+class AdminToggleCategoryStatusView(SuperuserRequiredMixin, View):
+    """Toggle is_active status of a category."""
+    
+    def post(self, request, pk):
+        cat = get_object_or_404(Category, pk=pk)
+        cat.is_active = not cat.is_active
+        cat.save(update_fields=['is_active'])
+        status = 'Activated' if cat.is_active else 'Deactivated'
+        messages.success(request, f'Category {cat.name} {status} successfully.')
         return redirect('admin_categories')

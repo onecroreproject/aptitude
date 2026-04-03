@@ -147,6 +147,23 @@ class CustomUser(AbstractUser):
             )
 
 
+class OTP(models.Model):
+    """
+    Temporary one-time password for password reset workflow.
+    """
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='otps')
+    code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_verified = models.BooleanField(default=False)
+
+    def is_expired(self):
+        # 10 minutes expiration
+        return timezone.now() > self.created_at + timezone.timedelta(minutes=10)
+
+    def __str__(self):
+        return f"OTP for {self.user.username} - {self.code}"
+
+
 # ──────────────────────────────────────────────
 # 2. CATEGORY MODEL
 # ──────────────────────────────────────────────
@@ -168,6 +185,11 @@ class Category(models.Model):
         help_text='Brief overview of what this category covers.'
     )
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    is_active = models.BooleanField(
+        default=True,
+        db_index=True,
+        help_text='Whether this category is visible to students.'
+    )
 
     class Meta:
         verbose_name = 'Category'

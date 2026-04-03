@@ -64,11 +64,11 @@
             <td>{{ question.time_limit_minutes }} min</td>
             <td>
               <div style="display: flex; gap: 8px;">
-                <a href="{% url 'admin_view_question' question.pk %}" class="btn btn-outline btn-sm">View</a>
-                <a href="{% url 'admin_edit_question' question.pk %}" class="btn btn-outline btn-sm">Edit</a>
+                <a href="{% url 'admin_view_question' question.pk %}" class="btn-action btn-view" title="View Question">👁️</a>
+                <a href="{% url 'admin_edit_question' question.pk %}" class="btn-action btn-edit" title="Edit Question">✏️</a>
                 <form action="{% url 'admin_delete_question' question.pk %}" method="POST" onsubmit="return confirm('Remove this question?');">
                   {% csrf_token %}
-                  <button type="submit" class="btn btn-outline btn-sm" style="color: var(--accent-danger); border-color: var(--accent-danger);">Delete</button>
+                  <button type="submit" class="btn-action btn-delete" title="Delete Question">🗑️</button>
                 </form>
               </div>
             </td>

@@ -70,8 +70,12 @@
             <td style="font-weight: 700;">{{ q.marks }}</td>
             <td>
               <div style="display: flex; gap: 8px;">
-                <a href="#" class="btn btn-outline btn-sm">🔧 Edit</a>
-                <a href="#" class="btn btn-outline btn-sm" style="color: var(--accent-danger);">🗑️ Delete</a>
+                <a href="{% url 'admin_view_question' q.pk %}" class="btn-action btn-view" title="View Details">👁️</a>
+                <a href="{% url 'admin_edit_question' q.pk %}" class="btn-action btn-edit" title="Edit Question">✏️</a>
+                <form action="{% url 'admin_delete_question' q.pk %}" method="POST" onsubmit="return confirm('Delete this question?');" style="display: inline;">
+                  {% csrf_token %}
+                  <button type="submit" class="btn-action btn-delete" title="Delete Question">🗑️</button>
+                </form>
               </div>
             </td>
           </tr>

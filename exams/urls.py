@@ -11,6 +11,9 @@ urlpatterns = [
     path('register/', views.RegisterView.as_view(), name='register'),
     path('login/', views.LoginView.as_view(), name='login'),
     path('logout/', views.LogoutView.as_view(), name='logout'),
+    path('forgot-password/', views.ForgotPasswordView.as_view(), name='forgot_password'),
+    path('verify-otp/', views.VerifyOTPView.as_view(), name='verify_otp'),
+    path('reset-password/', views.ResetPasswordView.as_view(), name='reset_password'),
     path('dashboard/', views.dashboard_redirect, name='dashboard'),
 
     # ── Student Interface ────────────────────────
@@ -24,7 +27,9 @@ urlpatterns = [
     path('student/notifications/', views.StudentNotificationsView.as_view(), name='student_notifications'),
 
     # ── Notification actions (shared) ────────────
+    path('notifications/fetch/', views.FetchNotificationsView.as_view(), name='fetch_notifications'),
     path('notifications/<uuid:notification_id>/read/', views.MarkNotificationReadView.as_view(), name='mark_notification_read'),
+    path('notifications/<uuid:notification_id>/delete/', views.DeleteNotificationView.as_view(), name='delete_notification'),
     path('notifications/mark-all-read/', views.MarkAllNotificationsReadView.as_view(), name='mark_all_read'),
 
     # ── Admin Dashboard ──────────────────────────
@@ -34,8 +39,10 @@ urlpatterns = [
     path('admin-panel/categories/<int:pk>/', views.AdminCategoryDetailView.as_view(), name='admin_category_detail'),
     path('admin-panel/categories/<int:pk>/edit/', views.AdminEditCategoryView.as_view(), name='admin_edit_category'),
     path('admin-panel/categories/<int:pk>/delete/', views.AdminDeleteCategoryView.as_view(), name='admin_delete_category'),
+    path('admin-panel/categories/<int:pk>/toggle/', views.AdminToggleCategoryStatusView.as_view(), name='admin_toggle_category'),
     path('admin-panel/students/', views.AdminStudentsView.as_view(), name='admin_students'),
     path('admin-panel/students/<int:pk>/', views.AdminStudentDetailView.as_view(), name='admin_student_detail'),
+    path('admin-panel/students/<int:pk>/delete/', views.AdminDeleteStudentView.as_view(), name='admin_delete_student'),
     path('admin-panel/questions/', views.AdminQuestionsView.as_view(), name='admin_questions'),
     path('admin-panel/questions/add/', views.AdminAddQuestionView.as_view(), name='admin_add_question'),
     path('admin-panel/questions/add/<int:category_id>/', views.AdminAddQuestionView.as_view(), name='admin_add_question_to_category'),

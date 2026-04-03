@@ -1,48 +1,69 @@
 {% load static %}
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}Exam Platform{% endblock %}</title>
-  
+  <title>{% block title %}Aptipro{% endblock %}</title>
+
   <!-- Modern Inter Font -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  
+
+  <!-- SweetAlert2 -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
   <!-- Main Styles -->
   <link rel="stylesheet" href="{% static 'css/style.css' %}">
-  
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="{% static 'images/logo.png' %}">
+  <link rel="shortcut icon" type="image/png" href="{% static 'images/logo.png' %}">
+
   {% block extra_css %}{% endblock %}
 </head>
+
 <body class="{% block body_class %}{% endblock %}">
 
   <div class="app-container">
-    
+
     <!-- ── Sidebar ── -->
     {% if user.is_authenticated %}
     <div class="sidebar" id="sidebar">
-      <div class="brand">
-        <span style="font-size: 24px;">📝</span>
-        <span>ExamPlatform</span>
+      <div class="brand" style="display: flex; justify-content: center; margin-top: -3.5rem;margin-bottom: -4rem;">
+        <img src="{% static 'images/logo.png' %}" alt="Aptipro Logo"
+          style="height: 150px; width: 200px; object-fit: contain;">
       </div>
-      
+
       <nav class="sidebar-nav">
         {% if user.is_superuser %}
-          <a href="{% url 'admin_dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}">📊 Dashboard</a>
-          <a href="{% url 'admin_categories' %}" class="nav-link {% if 'category' in request.resolver_match.url_name %}active{% endif %}">📁 Categories</a>
-          <a href="{% url 'admin_students' %}" class="nav-link {% if 'student' in request.resolver_match.url_name %}active{% endif %}">👥 Students</a>
-          <a href="{% url 'admin_exam_requests' %}" class="nav-link {% if 'request' in request.resolver_match.url_name %}active{% endif %}">⚖️ Requests</a>
-          <a href="{% url 'admin_results' %}" class="nav-link {% if 'result' in request.resolver_match.url_name %}active{% endif %}">🏅 Results</a>
+        <a href="{% url 'admin_dashboard' %}"
+          class="nav-link {% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}">📊
+          Dashboard</a>
+        <a href="{% url 'admin_categories' %}"
+          class="nav-link {% if 'category' in request.resolver_match.url_name %}active{% endif %}">📁 Categories</a>
+        <a href="{% url 'admin_students' %}"
+          class="nav-link {% if 'student' in request.resolver_match.url_name %}active{% endif %}">👥 Students</a>
+        <a href="{% url 'admin_exam_requests' %}"
+          class="nav-link {% if 'request' in request.resolver_match.url_name %}active{% endif %}">⚖️ Requests</a>
+        <a href="{% url 'admin_results' %}"
+          class="nav-link {% if 'result' in request.resolver_match.url_name %}active{% endif %}">🏅 Results</a>
         {% else %}
-          <a href="{% url 'student_dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'student_dashboard' %}active{% endif %}">🏠 Dashboard</a>
-          <a href="{% url 'student_categories' %}" class="nav-link {% if 'category' in request.resolver_match.url_name %}active{% endif %}">📂 Exam Categories</a>
-          <a href="{% url 'student_history' %}" class="nav-link {% if 'history' in request.resolver_match.url_name %}active{% endif %}">📜 My History</a>
-          <a href="{% url 'student_profile' %}" class="nav-link {% if 'profile' in request.resolver_match.url_name %}active{% endif %}">👤 My Profile</a>
+        <a href="{% url 'student_dashboard' %}"
+          class="nav-link {% if request.resolver_match.url_name == 'student_dashboard' %}active{% endif %}">🏠
+          Dashboard</a>
+        <a href="{% url 'student_categories' %}"
+          class="nav-link {% if 'category' in request.resolver_match.url_name %}active{% endif %}">📂 Exam
+          Categories</a>
+        <a href="{% url 'student_history' %}"
+          class="nav-link {% if 'history' in request.resolver_match.url_name %}active{% endif %}">📜 My History</a>
+        <a href="{% url 'student_profile' %}"
+          class="nav-link {% if 'profile' in request.resolver_match.url_name %}active{% endif %}">👤 My Profile</a>
         {% endif %}
       </nav>
-      
+
       <div style="padding: 16px; border-top: 1px solid var(--border-color);">
         <a href="{% url 'logout' %}" class="nav-link" style="color: var(--accent-danger);">🚪 Logout</a>
       </div>
@@ -52,57 +73,163 @@
 
     <!-- ── Main Area ── -->
     <div class="main-content">
-      
+
       {% if user.is_authenticated %}
       <header class="header">
         <div class="mobile-toggle" onclick="toggleSidebar()">☰</div>
-        
+
         <h1 style="font-size: 18px; font-weight: 700; color: var(--text-primary);">
           {% block page_title %}Dashboard{% endblock %}
         </h1>
-        
-        <div class="user-meta" id="userMenuTrigger" onclick="toggleUserDropdown(event)">
-          <a href="{% if user.is_superuser %}{% url 'admin_notifications' %}{% else %}{% url 'student_notifications' %}{% endif %}" class="notification-bell">
-            🔔 {% if unread_count > 0 %}<span class="notification-badge"></span>{% endif %}
-          </a>
-          
-          <div class="user-profile-trigger">
-            <div class="user-info-text">
-              <span class="user-name">{{ user.name|default:user.username }}</span>
-              <span class="user-role">{{ user.get_role_display }}</span>
-            </div>
-            {% if user.profile_photo %}
-              <img src="{{ user.profile_photo.url }}" alt="Profile" class="profile-circle">
-            {% else %}
-              <div class="profile-placeholder">{{ user.username.0|upper }}</div>
-            {% endif %}
 
-            <!-- Dropdown Menu -->
-            <div class="user-dropdown" id="userDropdown">
-              <a href="{% if user.is_superuser %}/admin/{% else %}{% url 'student_profile' %}{% endif %}" class="dropdown-item">👤 View Profile</a>
-              <a href="{% url 'logout' %}" class="dropdown-item" style="color: var(--accent-danger); border-top: 1px solid var(--border-color);">🚪 Logout Session</a>
+        <div class="header-actions">
+          <!-- Notification Dropdown -->
+          <div class="notification-container" id="notifContainer">
+            <div class="notification-bell" onclick="toggleNotifDropdown(event)">
+              🔔 {% if unread_count > 0 %}<span class="notification-badge" id="notifBadge"></span>{% endif %}
+            </div>
+
+            <div class="notif-dropdown" id="notifDropdown">
+              <div class="notif-header">
+                <h3>Notifications</h3>
+                <span id="notifCountText">{% if unread_count %}{{ unread_count }} Unread{% else %}No Unread{% endif %}</span>
+              </div>
+              <div class="notif-list" id="notifList">
+                <div class="notif-empty" id="notifEmpty">Loading...</div>
+              </div>
+              <div class="notif-footer">
+                <a href="{% if user.is_superuser %}{% url 'admin_notifications' %}{% else %}{% url 'student_notifications' %}{% endif %}" class="view-all">View All Notifications</a>
+              </div>
             </div>
           </div>
-        </div>
+
+          <div class="user-meta" id="userMenuTrigger" onclick="toggleUserDropdown(event)">
+
+            <div class="user-profile-trigger">
+              <div class="user-info-text">
+                <span class="user-name">{{ user.name|default:user.username }}</span>
+                <span class="user-role">{{ user.get_role_display }}</span>
+              </div>
+              {% if user.profile_photo %}
+              <img src="{{ user.profile_photo.url }}" alt="Profile" class="profile-circle">
+              {% else %}
+              <div class="profile-placeholder">{{ user.username.0|upper }}</div>
+              {% endif %}
+
+              <!-- Dropdown Menu -->
+              <div class="user-dropdown" id="userDropdown">
+                <a href="{% if user.is_superuser %}/admin/{% else %}{% url 'student_profile' %}{% endif %}" class="dropdown-item">👤 View Profile</a>
+                <a href="{% url 'logout' %}" class="dropdown-item" style="color: var(--accent-danger); border-top: 1px solid var(--border-color);">🚪 Logout Session</a>
+              </div>
+            </div>
+          </div> <!-- End user-meta -->
+        </div> <!-- End header-actions -->
       </header>
       {% endif %}
 
       <main class="content-body">
         {% if messages %}
-          {% for message in messages %}
-            <div class="card" style="border-left: 4px solid var(--accent-{% if message.tags == 'error' %}danger{% elif message.tags == 'success' %}success{% else %}primary{% endif %}); padding: 16px; margin-bottom: 24px;">
-              {{ message }}
-            </div>
-          {% endfor %}
+        <script>
+          document.addEventListener('DOMContentLoaded', function () {
+            {% for message in messages %}
+            Swal.fire({
+              toast: true,
+              position: 'top-end',
+              showConfirmButton: false,
+              timer: 3000,
+              timerProgressBar: true,
+              icon: '{% if message.tags == "error" %}error{% elif message.tags == "success" %}success{% elif message.tags == "warning" %}warning{% else %}info{% endif %}',
+              title: '{{ message }}',
+              customClass: {
+                popup: 'colored-toast'
+              }
+            });
+            {% endfor %}
+          });
+        </script>
         {% endif %}
-        
+
         {% block content %}{% endblock %}
       </main>
-      
+
     </div>
   </div>
 
   <script>
+    // Notification & UI Logic
+    let lastNotifCount = {{ unread_count|default:0 }};
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playNotificationSound() {
+      try {
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + 0.1);
+      } catch (e) { }
+    }
+
+    function showBrowserNotification(title, message) {
+      if (!("Notification" in window)) return;
+      if (Notification.permission === "granted") {
+        new Notification("Aptipro: " + title, { body: message });
+        playNotificationSound();
+      }
+    }
+
+    async function fetchNotifications() {
+      try {
+        const response = await fetch('/notifications/fetch/');
+        const data = await response.json();
+
+        if (data.count > lastNotifCount) {
+          const latest = data.notifications[0];
+          showBrowserNotification(latest.title, latest.message);
+        }
+        lastNotifCount = data.count;
+        updateNotifUI(data);
+      } catch (e) { }
+    }
+
+    function updateNotifUI(data) {
+      const bell = document.querySelector('.notification-bell');
+      const countText = document.getElementById('notifCountText');
+      const list = document.getElementById('notifList');
+
+      let badge = document.getElementById('notifBadge');
+      if (data.count > 0) {
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'notification-badge';
+          badge.id = 'notifBadge';
+          bell.appendChild(badge);
+        }
+        if (countText) countText.innerText = `${data.count} Unread`;
+      } else {
+        if (badge) badge.remove();
+        if (countText) countText.innerText = 'No Unread';
+      }
+
+      if (list) {
+        if (data.notifications && data.notifications.length > 0) {
+          list.innerHTML = data.notifications.map(n => `
+            <div class="notif-item">
+              <div class="notif-title">${n.title}</div>
+              <div class="notif-msg">${n.message}</div>
+              <div class="notif-time">${n.created_at}</div>
+            </div>
+          `).join('');
+        } else {
+          list.innerHTML = '<div class="notif-empty">No unread notifications</div>';
+        }
+      }
+    }
+
     function toggleSidebar() {
       const sidebar = document.getElementById('sidebar');
       const overlay = document.getElementById('sidebarOverlay');
@@ -110,27 +237,40 @@
       overlay.style.display = sidebar.classList.contains('active') ? 'block' : 'none';
     }
 
-    function toggleUserDropdown(event) {
-      event.stopPropagation();
-      const dropdown = document.getElementById('userDropdown');
-      dropdown.classList.toggle('active');
+    function toggleNotifDropdown(e) {
+      e.stopPropagation();
+      const dropdown = document.getElementById('notifDropdown');
+      dropdown.classList.toggle('show');
+      const userDropdown = document.getElementById('userDropdown');
+      if (userDropdown) userDropdown.classList.remove('active');
+      if (dropdown.classList.contains('show')) fetchNotifications();
     }
 
-    // Close dropdowns when clicking outside
-    window.onclick = function(event) {
+    function toggleUserDropdown(e) {
+      e.stopPropagation();
       const dropdown = document.getElementById('userDropdown');
-      if (dropdown && dropdown.classList.contains('active')) {
-        if (!event.target.closest('#userMenuTrigger')) {
-          dropdown.classList.remove('active');
-        }
+      if (dropdown) {
+        dropdown.classList.toggle('active');
+        const notifDropdown = document.getElementById('notifDropdown');
+        if (notifDropdown) notifDropdown.classList.remove('show');
       }
     }
 
-    if (document.getElementById('sidebarOverlay')) {
-      document.getElementById('sidebarOverlay').onclick = toggleSidebar;
+    window.onclick = function (event) {
+      const userDropdown = document.getElementById('userDropdown');
+      const notifDropdown = document.getElementById('notifDropdown');
+      if (userDropdown && !event.target.closest('.user-meta')) userDropdown.classList.remove('active');
+      if (notifDropdown && !event.target.closest('.notification-container')) notifDropdown.classList.remove('show');
+    };
+
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
     }
+
+    setInterval(fetchNotifications, 15000);
   </script>
-  
+
   {% block extra_js %}{% endblock %}
 </body>
+
 </html>

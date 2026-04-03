@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}Notifications — Exam Platform{% endblock %}
+{% block title %}Notifications — Aptipro{% endblock %}
 {% block page_title %}My Notifications{% endblock %}
 
 {% block content %}
@@ -35,9 +35,15 @@
                     </p>
                 </div>
                 
-                {% if not notif.is_read %}
-                    <div style="width: 8px; height: 8px; border-radius: 50%; background: var(--accent-primary); position: absolute; right: 20px; top: 45%;"></div>
-                {% endif %}
+                <div style="display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; gap: 10px;">
+                    <form method="post" action="{% url 'delete_notification' notif.id %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm" style="background: transparent; color: var(--accent-danger); border: none; padding: 4px; border-radius: 4px; cursor: pointer;" title="Delete Notification">🗑️</button>
+                    </form>
+                    {% if not notif.is_read %}
+                        <div style="width: 10px; height: 10px; border-radius: 50%; background: var(--accent-primary);" title="Unread"></div>
+                    {% endif %}
+                </div>
             </div>
         {% empty %}
             <div style="text-align: center; padding: 60px; color: var(--text-muted);">
