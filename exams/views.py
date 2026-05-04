@@ -655,6 +655,8 @@ class AdminStudentsView(SuperuserRequiredMixin, ListView):
     def get_queryset(self):
         qs = CustomUser.objects.filter(role='Student').order_by('-date_joined')
         search = self.request.GET.get('search', '').strip()
+        min_pct = self.request.GET.get('min_percentage', '').strip()
+
         if search:
             qs = qs.filter(
                 Q(username__icontains=search) |
@@ -663,11 +665,27 @@ class AdminStudentsView(SuperuserRequiredMixin, ListView):
                 Q(email__icontains=search) |
                 Q(institution__icontains=search)
             )
+
+        if min_pct:
+            try:
+                val = float(min_pct)
+                from django.db.models.functions import Cast
+                from django.db.models import FloatField
+                valid_student_ids = StudentExamResult.objects.filter(
+                    total_marks_possible__gt=0
+                ).annotate(
+                    calc_pct=Cast(F('total_marks_obtained'), FloatField()) * 100 / Cast(F('total_marks_possible'), FloatField())
+                ).filter(calc_pct__gte=val).values_list('student_id', flat=True)
+                qs = qs.filter(id__in=valid_student_ids)
+            except ValueError:
+                pass
+
         return qs
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx['search'] = self.request.GET.get('search', '')
+        ctx['min_percentage'] = self.request.GET.get('min_percentage', '')
         ctx['total_students'] = self.get_queryset().count()
         return ctx
 
@@ -997,6 +1015,7 @@ class AdminResultsView(SuperuserRequiredMixin, ListView):
 
         status = self.request.GET.get('status', '').strip()
         search = self.request.GET.get('search', '').strip()
+        min_pct = self.request.GET.get('min_percentage', '').strip()
 
         if status:
             qs = qs.filter(status=status)
@@ -1006,6 +1025,16 @@ class AdminResultsView(SuperuserRequiredMixin, ListView):
                 Q(student__first_name__icontains=search) |
                 Q(student__last_name__icontains=search)
             )
+        if min_pct:
+            try:
+                val = float(min_pct)
+                from django.db.models.functions import Cast
+                from django.db.models import FloatField
+                qs = qs.filter(total_marks_possible__gt=0).annotate(
+                    calc_pct=Cast(F('total_marks_obtained'), FloatField()) * 100 / Cast(F('total_marks_possible'), FloatField())
+                ).filter(calc_pct__gte=val)
+            except ValueError:
+                pass
         return qs
 
     def get_context_data(self, **kwargs):
@@ -1013,9 +1042,11 @@ class AdminResultsView(SuperuserRequiredMixin, ListView):
         ctx['status_choices'] = StudentExamResult.Status.choices
         ctx['current_status'] = self.request.GET.get('status', '')
         ctx['search'] = self.request.GET.get('search', '')
+        ctx['min_percentage'] = self.request.GET.get('min_percentage', '')
 
-        # Summary stats
-        evaluated = StudentExamResult.objects.filter(status='Evaluated')
+        # Summary stats based on filtered queryset
+        qs = self.get_queryset()
+        evaluated = qs.filter(status='Evaluated')
         ctx['total_evaluated'] = evaluated.count()
         avg = evaluated.aggregate(avg=Avg('total_marks_obtained'))
         ctx['avg_marks'] = round(avg['avg'] or 0, 1)
@@ -1129,3 +1160,198 @@ class AdminToggleCategoryStatusView(SuperuserRequiredMixin, View):
         status = 'Activated' if cat.is_active else 'Deactivated'
         messages.success(request, f'Category {cat.name} {status} successfully.')
         return redirect('admin_categories')
+
+
+class PreviewCertificateView(View):
+    """Generates and serves the certificate preview elegantly in HTML or directly as a PNG in the browser."""
+    def get(self, request):
+        from django.http import HttpResponse
+
+        if request.GET.get('raw') != '1':
+            html_content = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Certificate Preview</title>
+                <style>
+                    body, html {
+                        margin: 0;
+                        padding: 0;
+                        width: 100%;
+                        height: 100%;
+                        background-color: #f4f4f4;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        overflow: hidden;
+                    }
+                    img {
+                        max-width: 100vw;
+                        max-height: 100vh;
+                        object-fit: contain;
+                        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+                        background-color: #fff;
+                    }
+                </style>
+            </head>
+            <body>
+                <img src="?raw=1" alt="Certificate Preview">
+            </body>
+            </html>
+            """
+            return HttpResponse(html_content)
+
+        from .models import StudentExamResult, Category, ExamPaper, CustomUser
+        import os
+        from PIL import Image, ImageDraw, ImageFont
+        from django.conf import settings
+        from django.utils import timezone
+
+        # Try to get the latest available exam result or create a dummy object
+        result = StudentExamResult.objects.first()
+        if not result:
+            class MockCategory:
+                name = "Python Programming"
+
+            class MockExamPaper:
+                category = MockCategory()
+
+            class MockStudent:
+                first_name = "Harish"
+                last_name = "Subramanian"
+                username = "harish"
+                email = "test@example.com"
+                profile_photo = None
+
+            class MockResult:
+                id = timezone.now()
+                student = MockStudent()
+                exam_paper = MockExamPaper()
+                def percentage(self):
+                    return 100.0
+
+            result = MockResult()
+
+        student = result.student
+        student_name = f"{student.first_name} {student.last_name}".strip() or student.username
+        course_name = result.exam_paper.category.name if result.exam_paper and result.exam_paper.category else "Aptitude Course"
+        score = float(result.percentage()) if hasattr(result, 'percentage') else 100.0
+        date_str = timezone.now().strftime("%B %Y")
+
+        # Create a blank white canvas exactly A4 Landscape size (1414 x 1000)
+        img = Image.new("RGB", (1414, 1000), color="#FFFFFF")
+        draw = ImageDraw.Draw(img)
+
+        # Thin blue/orange bottom bar
+        draw.rectangle([(0, 976), (1414, 1000)], fill="#0B4A8F")
+        draw.rectangle([(1131, 976), (1414, 1000)], fill="#FF9900")
+
+        # Draw ribbon on the right
+        draw.rectangle([(1131, 0), (1261, 888)], fill="#0B4A8F")
+        draw.polygon([(1131, 888), (1196, 941), (1261, 888)], fill="#0B4A8F")
+        draw.polygon([(1131, 894), (1196, 947), (1261, 894)], fill="#FF9900")
+
+        def get_font(font_name, size):
+            try:
+                return ImageFont.truetype(font_name, size)
+            except OSError:
+                try:
+                    return ImageFont.truetype("arial.ttf", size)
+                except OSError:
+                    return ImageFont.load_default()
+
+        # Logo
+        logo_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'dlklogo.png')
+        if not os.path.exists(logo_path):
+            logo_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'dlklogo.jpg')
+        if not os.path.exists(logo_path):
+            logo_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'Logo.png')
+
+        if os.path.exists(logo_path):
+            try:
+                logo = Image.open(logo_path).convert("RGBA")
+                logo = logo.resize((212, 82), Image.Resampling.LANCZOS)
+                img.paste(logo, (82, 76), logo)
+            except Exception:
+                try:
+                    logo = Image.open(logo_path).convert("RGB")
+                    logo = logo.resize((212, 82), Image.Resampling.LANCZOS)
+                    img.paste(logo, (82, 76))
+                except Exception:
+                    pass
+
+        # Text
+        font_title = get_font("times.ttf", 52)
+        font_small = get_font("arial.ttf", 24)
+        font_name = get_font("times.ttf", 54)
+        font_course = get_font("times.ttf", 42)
+
+        draw.text((82, 247), "CERTIFICATE OF COMPLETION", font=font_title, fill="#1A1A1A")
+        draw.text((82, 335), "Presented to", font=font_small, fill="#555555")
+        draw.text((82, 382), student_name, font=font_name, fill="#0B4A8F")
+        draw.text((82, 488), "For successfully completing an online course", font=font_small, fill="#555555")
+        draw.text((82, 535), course_name, font=font_course, fill="#1A1A1A")
+        draw.text((82, 606), f"Course completed on {date_str}", font=font_small, fill="#555555")
+
+        # Skill India.png on the right above profile
+        skill_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'Skill India.png')
+        if os.path.exists(skill_path):
+            try:
+                skill_img = Image.open(skill_path).convert("RGBA")
+                skill_img = skill_img.resize((120, 120), Image.Resampling.LANCZOS)
+                img.paste(skill_img, (952, 76), skill_img)
+            except Exception:
+                pass
+
+        # Profile Image right
+        draw.text((930, 222), "STUDENT PROFILE", font=get_font("arial.ttf", 16), fill="#555555")
+        profile_drawn = False
+        if student.profile_photo and hasattr(student.profile_photo, 'path') and os.path.exists(student.profile_photo.path):
+            try:
+                p_img = Image.open(student.profile_photo.path).convert("RGB")
+                p_img = p_img.resize((165, 165), Image.Resampling.LANCZOS)
+                img.paste(p_img, (930, 250))
+                profile_drawn = True
+            except Exception:
+                pass
+
+        if not profile_drawn:
+            draw.rectangle([(930, 250), (1095, 415)], outline="#D0D0D0", width=1, fill="#EFEFEF")
+            draw.text((971, 321), "No Photo", fill="#7F8C8D", font=get_font("arial.ttf", 18))
+
+        draw.rectangle([(928, 248), (1097, 417)], outline="#D0D0D0", width=1)
+
+        # Seal
+        seal_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'Seal Image.png')
+        seal_drawn = False
+        if os.path.exists(seal_path):
+            try:
+                seal_img = Image.open(seal_path).convert("RGBA")
+                seal_img = seal_img.resize((165, 165), Image.Resampling.LANCZOS)
+                img.paste(seal_img, (1114, 435), seal_img)
+                seal_drawn = True
+            except Exception:
+                pass
+
+        if not seal_drawn:
+            draw.ellipse([(1114, 435), (1279, 600)], outline="#0B4A8F", fill="#FFFFFF", width=4)
+            draw.text((1155, 494), "G", font=get_font("times.ttf", 61), fill="#0B4A8F")
+
+        # Signature
+        draw.line([(82, 759), (318, 759)], fill="#D0D0D0", width=1)
+        draw.text((82, 771), "Harish Subramanian", fill="#1A1A1A", font=get_font("arial.ttf", 19))
+        draw.text((82, 794), "Academic Director, Great Learning", fill="#555555", font=get_font("arial.ttf", 16))
+
+        sig_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'Signature.png')
+        if os.path.exists(sig_path):
+            try:
+                sig_img = Image.open(sig_path).convert("RGBA")
+                sig_img = sig_img.resize((188, 70), Image.Resampling.LANCZOS)
+                img.paste(sig_img, (82, 682), sig_img)
+            except Exception:
+                pass
+
+        # Return as PNG direct response
+        response = HttpResponse(content_type="image/png")
+        img.save(response, "PNG")
+        return response

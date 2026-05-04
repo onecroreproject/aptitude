@@ -58,4 +58,5 @@ urlpatterns = [
     path('admin-panel/results/', views.AdminResultsView.as_view(), name='admin_results'),
     path('admin-panel/results/<uuid:pk>/', views.AdminResultDetailView.as_view(), name='admin_result_detail'),
     path('admin-panel/notifications/', views.AdminNotificationsView.as_view(), name='admin_notifications'),
+    path('preview-certificate/', views.PreviewCertificateView.as_view(), name='preview_certificate'),
 ]

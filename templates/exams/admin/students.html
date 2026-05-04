@@ -7,10 +7,11 @@
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
         <div class="card-title">Students ({{ total_students }})</div>
         
-        <form method="get" style="display: flex; gap: 12px; flex: 1; max-width: 400px;">
+        <form method="get" style="display: flex; gap: 12px; flex: 1; max-width: 500px;">
             <input type="text" name="search" class="form-input" placeholder="Search by name, email or institution..." value="{{ search }}" style="width: 100%; border-radius: 8px; border: 1px solid var(--border-color); padding: 8px 12px; background: var(--bg-secondary);">
+            <input type="number" name="min_percentage" class="form-input" placeholder="Min %..." value="{{ min_percentage }}" style="width: 100px; border-radius: 8px; border: 1px solid var(--border-color); padding: 8px 12px; background: var(--bg-secondary);" min="0" max="100">
             <button type="submit" class="btn btn-primary btn-sm">Search</button>
-            {% if search %}<a href="{% url 'admin_students' %}" class="btn btn-outline btn-sm">Clear</a>{% endif %}
+            {% if search or min_percentage %}<a href="{% url 'admin_students' %}" class="btn btn-outline btn-sm">Clear</a>{% endif %}
         </form>
     </div>
 
@@ -83,11 +84,11 @@
     {% if is_paginated %}
     <div style="margin-top: 24px; display: flex; justify-content: center; gap: 8px;">
         {% if page_obj.has_previous %}
-            <a href="?page={{ page_obj.previous_page_number }}&search={{ search }}" class="btn btn-outline btn-sm">Previous</a>
+            <a href="?page={{ page_obj.previous_page_number }}&search={{ search }}&min_percentage={{ min_percentage }}" class="btn btn-outline btn-sm">Previous</a>
         {% endif %}
         <span style="padding: 4px 12px; font-weight: 600;">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
         {% if page_obj.has_next %}
-            <a href="?page={{ page_obj.next_page_number }}&search={{ search }}" class="btn btn-outline btn-sm">Next</a>
+            <a href="?page={{ page_obj.next_page_number }}&search={{ search }}&min_percentage={{ min_percentage }}" class="btn btn-outline btn-sm">Next</a>
         {% endif %}
     </div>
     {% endif %}

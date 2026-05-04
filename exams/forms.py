@@ -75,13 +75,20 @@ class StudentRegistrationForm(UserCreationForm):
             'placeholder': 'Institution / College',
         }),
     )
+    profile_photo = forms.ImageField(
+        required=False,
+        widget=forms.FileInput(attrs={
+            'class': 'form-input',
+            'accept': 'image/*',
+        }),
+    )
 
     class Meta:
         model = CustomUser
         fields = [
             'username', 'first_name', 'last_name', 'email', 
             'phone_number', 'whatsapp_number', 'institution', 
-            'password1', 'password2'
+            'profile_photo', 'password1', 'password2'
         ]
         widgets = {
             'username': forms.TextInput(attrs={
@@ -113,6 +120,8 @@ class StudentRegistrationForm(UserCreationForm):
         user.phone_number = self.cleaned_data.get('phone_number')
         user.whatsapp_number = self.cleaned_data.get('whatsapp_number')
         user.institution = self.cleaned_data.get('institution')
+        if self.cleaned_data.get('profile_photo'):
+            user.profile_photo = self.cleaned_data.get('profile_photo')
         
         if commit:
             user.save()

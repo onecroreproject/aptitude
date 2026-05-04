@@ -634,7 +634,7 @@ class StudentExamResult(models.Model):
             (float(self.total_marks_obtained) / self.total_marks_possible) * 100, 2
         )
 
-    def is_passed(self, pass_percentage=40):
+    def is_passed(self, pass_percentage=85):
         """Check pass/fail against a configurable threshold."""
         return self.percentage() >= pass_percentage
 
@@ -675,6 +675,14 @@ class StudentExamResult(models.Model):
             'total_marks_obtained', 'total_marks_possible',
             'status', 'completed_at',
         ])
+        if self.percentage() >= 85:
+            from .utils import generate_and_send_certificate
+            try:
+                generate_and_send_certificate(self)
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error sending certificate: {e}")
 
     def clean(self):
         super().clean()
