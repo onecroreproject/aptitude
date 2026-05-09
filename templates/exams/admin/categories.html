@@ -11,57 +11,96 @@
     <a href="{% url 'admin_add_category' %}" class="btn btn-primary">+ Add New Category</a>
   </div>
   
-  <div class="table-container">
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Category Name</th>
-          <th>Description</th>
-          <th>Questions</th>
-          <th>Created At</th>
-          <th>⚙️ Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for category in categories %}
+  <form id="bulk-delete-form" action="{% url 'admin_bulk_delete_categories' %}" method="POST" 
+        onsubmit="confirmAction({event: event, title: 'Delete Selected Categories?', text: 'All questions inside these categories will also be permanently deleted.', confirmButtonText: 'Yes, Delete All', callback: () => this.submit()});">
+    {% csrf_token %}
+    <div style="margin-bottom: 12px; display: none;" id="bulk-actions-bar">
+      <button type="submit" class="btn btn-rejected btn-sm">🗑️ Delete Selected Categories</button>
+    </div>
+
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
           <tr>
-            <td style="padding: 16px 20px;">
-              <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; min-width: 200px;">
-                <span style="font-weight: 700; color: var(--text-primary); font-size: 15px;">{{ category.name }}</span>
-                <form action="{% url 'admin_toggle_category' category.pk %}" method="POST" style="display: inline; line-height: 1;">
-                  {% csrf_token %}
-                  <button type="submit" class="btn btn-sm {% if category.is_active %}btn-success{% else %}btn-danger{% endif %}" 
-                          style="padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 6px; min-width: 70px; text-transform: uppercase; border: none; cursor: pointer; transition: all 0.2s;">
-                    {% if category.is_active %}Active{% else %}Inactive{% endif %}
-                  </button>
-                </form>
-              </div>
-            </td>
-            <td style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">{{ category.description|truncatewords:10 }}</td>
-            <td style="text-align: center;">
-              <span class="badge badge-approved" style="padding: 4px 10px; border-radius: 20px;" title="Total Questions">{{ category.q_count }}</span>
-            </td>
-            <td style="font-size: 12px; font-weight: 500; color: var(--text-muted);">{{ category.created_at|date:"M d, Y" }}</td>
-            <td>
-              <div style="display: flex; gap: 12px; align-items: center; justify-content: flex-start;">
-                <a href="{% url 'admin_category_detail' category.pk %}" class="btn-action btn-view" title="View Category Details">👁️</a>
-                <a href="{% url 'admin_edit_category' category.pk %}" class="btn-action btn-edit" title="Edit Category">✏️</a>
-                <form action="{% url 'admin_delete_category' category.pk %}" method="POST" onsubmit="return confirm('Delete this category?');" style="display: inline;">
-                  {% csrf_token %}
-                  <button type="submit" class="btn-action btn-delete" title="Delete Category">🗑️</button>
-                </form>
-              </div>
-            </td>
+            <th style="width: 40px;"><input type="checkbox" id="select-all"></th>
+            <th>Category Name</th>
+            <th>Description</th>
+            <th>Questions</th>
+            <th>Created At</th>
+            <th>⚙️ Actions</th>
           </tr>
-        {% empty %}
-          <tr>
-            <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 48px;">
-              No categories found. Start by creating your first category.
-            </td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+        </thead>
+        <tbody>
+          {% for category in categories %}
+            <tr>
+              <td><input type="checkbox" name="selected_ids" value="{{ category.id }}" class="record-checkbox"></td>
+              <td style="padding: 16px 20px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; min-width: 200px;">
+                  <span style="font-weight: 700; color: var(--text-primary); font-size: 15px;">{{ category.name }}</span>
+                  <form action="{% url 'admin_toggle_category' category.pk %}" method="POST" style="display: inline; line-height: 1;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm {% if category.is_active %}btn-success{% else %}btn-danger{% endif %}" 
+                            style="padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 6px; min-width: 70px; text-transform: uppercase; border: none; cursor: pointer; transition: all 0.2s;">
+                      {% if category.is_active %}Active{% else %}Inactive{% endif %}
+                    </button>
+                  </form>
+                </div>
+              </td>
+              <td style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">{{ category.description|truncatewords:10 }}</td>
+              <td style="text-align: center;">
+                <span class="badge badge-approved" style="padding: 4px 10px; border-radius: 20px;" title="Total Questions">{{ category.q_count }}</span>
+              </td>
+              <td style="font-size: 12px; font-weight: 500; color: var(--text-muted);">{{ category.created_at|date:"M d, Y" }}</td>
+              <td>
+                <div style="display: flex; gap: 12px; align-items: center; justify-content: flex-start;">
+                  <a href="{% url 'admin_category_detail' category.pk %}" class="btn-action btn-view" title="View Category Details">👁️</a>
+                  <a href="{% url 'admin_edit_category' category.pk %}" class="btn-action btn-edit" title="Edit Category">✏️</a>
+                  <form action="{% url 'admin_delete_category' category.pk %}" method="POST" 
+                        onsubmit="confirmAction({event: event, title: 'Delete Category?', text: 'All questions inside this category will be permanently deleted.', confirmButtonText: 'Yes, Delete It', callback: () => this.submit()});" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-action btn-delete" title="Delete Category">🗑️</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 48px;">
+                No categories found. Start by creating your first category.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </form>
 </div>
+
+<script>
+  const selectAll = document.getElementById('select-all');
+  const checkboxes = document.querySelectorAll('.record-checkbox');
+  const bulkBar = document.getElementById('bulk-actions-bar');
+
+  function updateBulkBar() {
+      const checkedCount = document.querySelectorAll('.record-checkbox:checked').length;
+      bulkBar.style.display = checkedCount > 0 ? 'block' : 'none';
+  }
+
+  if (selectAll) {
+      selectAll.addEventListener('change', () => {
+          checkboxes.forEach(cb => {
+              cb.checked = selectAll.checked;
+          });
+          updateBulkBar();
+      });
+  }
+
+  checkboxes.forEach(cb => {
+      cb.addEventListener('change', () => {
+          updateBulkBar();
+          if (!cb.checked) selectAll.checked = false;
+          if (document.querySelectorAll('.record-checkbox:checked').length === checkboxes.length) selectAll.checked = true;
+      });
+  });
+</script>
 {% endblock %}

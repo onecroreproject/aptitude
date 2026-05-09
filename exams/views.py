@@ -1008,9 +1008,9 @@ class AdminResultsView(SuperuserRequiredMixin, ListView):
     context_object_name = 'results'
     paginate_by = 20
 
-    def get_queryset(self):
+    def get_filtered_queryset(self):
         qs = StudentExamResult.objects.select_related(
-            'student', 'exam_paper'
+            'student', 'exam_paper', 'exam_paper__category'
         ).order_by('-started_at')
 
         status = self.request.GET.get('status', '').strip()
@@ -1037,6 +1037,9 @@ class AdminResultsView(SuperuserRequiredMixin, ListView):
                 pass
         return qs
 
+    def get_queryset(self):
+        return self.get_filtered_queryset()
+
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx['status_choices'] = StudentExamResult.Status.choices
@@ -1052,6 +1055,124 @@ class AdminResultsView(SuperuserRequiredMixin, ListView):
         ctx['avg_marks'] = round(avg['avg'] or 0, 1)
 
         return ctx
+
+
+class AdminDeleteResultView(SuperuserRequiredMixin, View):
+    """Delete a specific exam result."""
+    def post(self, request, pk):
+        result = get_object_or_404(StudentExamResult, pk=pk)
+        student_name = result.student.username
+        result.delete()
+        messages.success(request, f"Exam result for {student_name} deleted successfully.")
+        return redirect('admin_results')
+
+
+class ExportResultsExcelView(AdminResultsView):
+    """Export filtered exam results to Excel."""
+    def get(self, request, *args, **kwargs):
+        import openpyxl
+        from django.http import HttpResponse
+        from openpyxl.styles import Font, Alignment, PatternFill
+
+        results = self.get_filtered_queryset()
+        
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Exam Results"
+
+        # Headers
+        headers = ["Student", "Email", "Category", "Score", "Percentage", "Status", "Date"]
+        ws.append(headers)
+
+        # Style headers
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="002147", end_color="002147", fill_type="solid")
+        for cell in ws[1]:
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal="center")
+
+        # Data
+        for r in results:
+            ws.append([
+                r.student.username,
+                r.student.email or "—",
+                r.exam_paper.category.name if r.exam_paper and r.exam_paper.category else "—",
+                f"{r.total_marks_obtained} / {r.total_marks_possible}",
+                f"{r.percentage()}%",
+                r.status,
+                r.started_at.strftime("%Y-%m-%d %H:%M")
+            ])
+
+        # Column widths
+        for col in ws.columns:
+            max_length = 0
+            column = col[0].column_letter
+            for cell in col:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            ws.column_dimensions[column].width = max_length + 2
+
+        response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        response["Content-Disposition"] = f"attachment; filename=exam_results_{timezone.now().strftime('%Y%m%d')}.xlsx"
+        wb.save(response)
+        return response
+
+
+class ExportResultsPDFView(AdminResultsView):
+    """Export filtered exam results to PDF."""
+    def get(self, request, *args, **kwargs):
+        from django.template.loader import get_template
+        from xhtml2pdf import pisa
+        from django.http import HttpResponse
+
+        results = self.get_filtered_queryset()
+        template = get_template('exams/admin/export/results_pdf.html')
+        context = {
+            'results': results,
+            'total_count': results.count(),
+            'generated_at': timezone.now(),
+            'search': self.request.GET.get('search', ''),
+            'status': self.request.GET.get('status', ''),
+        }
+        html = template.render(context)
+        
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="exam_results_{timezone.now().strftime("%Y%m%d")}.pdf"'
+        
+        pisa_status = pisa.CreatePDF(html, dest=response)
+        if pisa_status.err:
+            return HttpResponse('Error generating PDF', status=500)
+        return response
+
+
+class AdminBulkDeleteResultsView(SuperuserRequiredMixin, View):
+    """Bulk delete selected exam results."""
+    def post(self, request):
+        selected_ids = request.POST.getlist('selected_ids')
+        if not selected_ids:
+            messages.warning(request, "No results selected for deletion.")
+            return redirect('admin_results')
+            
+        count = StudentExamResult.objects.filter(id__in=selected_ids).delete()[0]
+        messages.success(request, f"Successfully deleted {count} exam results.")
+        return redirect('admin_results')
+
+
+class AdminBulkDeleteStudentsView(SuperuserRequiredMixin, View):
+    """Bulk delete selected students."""
+    def post(self, request):
+        selected_ids = request.POST.getlist('selected_ids')
+        if not selected_ids:
+            messages.warning(request, "No students selected for deletion.")
+            return redirect('admin_students')
+            
+        count = CustomUser.objects.filter(id__in=selected_ids, role='Student').delete()[0]
+        messages.success(request, f"Successfully deleted {count} students.")
+        return redirect('admin_students')
 
 
 class AdminResultDetailView(SuperuserRequiredMixin, DetailView):
@@ -1138,15 +1259,26 @@ class AdminEditCategoryView(SuperuserRequiredMixin, View):
 
 
 class AdminDeleteCategoryView(SuperuserRequiredMixin, View):
-    """Delete a category (only if no questions linked, else soft error)."""
+    """Delete a category (cascades to questions and exam papers)."""
     
     def post(self, request, pk):
         cat = get_object_or_404(Category, pk=pk)
-        if cat.questions.exists() or cat.exam_papers.exists():
-            messages.error(request, 'Cannot delete category that has questions or exam papers linked.')
-        else:
-            cat.delete()
-            messages.success(request, 'Category deleted successfully.')
+        cat.delete()
+        messages.success(request, 'Category and all related data deleted successfully.')
+        return redirect('admin_categories')
+
+
+class AdminBulkDeleteCategoriesView(SuperuserRequiredMixin, View):
+    """Bulk delete selected categories."""
+    
+    def post(self, request):
+        selected_ids = request.POST.getlist('selected_ids')
+        if not selected_ids:
+            messages.warning(request, "No categories selected for deletion.")
+            return redirect('admin_categories')
+            
+        count = Category.objects.filter(id__in=selected_ids).delete()[0]
+        messages.success(request, f"Successfully deleted {count} categories and their related questions.")
         return redirect('admin_categories')
 
 
@@ -1242,116 +1374,280 @@ class PreviewCertificateView(View):
         img = Image.new("RGB", (1414, 1000), color="#FFFFFF")
         draw = ImageDraw.Draw(img)
 
-        # Thin blue/orange bottom bar
-        draw.rectangle([(0, 976), (1414, 1000)], fill="#0B4A8F")
-        draw.rectangle([(1131, 976), (1414, 1000)], fill="#FF9900")
-
-        # Draw ribbon on the right
-        draw.rectangle([(1131, 0), (1261, 888)], fill="#0B4A8F")
-        draw.polygon([(1131, 888), (1196, 941), (1261, 888)], fill="#0B4A8F")
-        draw.polygon([(1131, 894), (1196, 947), (1261, 894)], fill="#FF9900")
+        # 1. Scale & Resolution (300 DPI: 3508 x 2480)
+        WIDTH, HEIGHT = 3508, 2480
+        SCALE = WIDTH / 1414.0 # Base scale relative to 1414 width
+        
+        img = Image.new("RGB", (WIDTH, HEIGHT), color="#FFFFFF")
+        draw = ImageDraw.Draw(img)
 
         def get_font(font_name, size):
+            scaled_size = int(size * SCALE)
             try:
-                return ImageFont.truetype(font_name, size)
+                return ImageFont.truetype(font_name, scaled_size)
             except OSError:
                 try:
-                    return ImageFont.truetype("arial.ttf", size)
+                    return ImageFont.truetype("arial.ttf", scaled_size)
                 except OSError:
                     return ImageFont.load_default()
 
-        # Logo
+        # Scaled Fonts
+        font_cert = get_font("times.ttf", 85)
+        font_sub = get_font("arial.ttf", 32)
+        font_present = get_font("arial.ttf", 22)
+        font_name = get_font("times.ttf", 78)
+        font_course = get_font("times.ttf", 42)
+        font_content = get_font("arial.ttf", 24)
+        font_footer = get_font("arial.ttf", 20)
+
+        # Better wave implementation using polygons for accuracy
+        import math
+        import textwrap
+        
+        # Deepest Navy Wave (Base)
+        wave_points = []
+        for x in range(-100, WIDTH + 100, 10):
+            # Scale the frequency and amplitude
+            y = (280 * SCALE) + math.cos(x / (300.0 * SCALE)) * (100 * SCALE)
+            wave_points.append((x, y))
+        wave_points.extend([(WIDTH, 0), (0, 0)])
+        draw.polygon(wave_points, fill="#000B1D")
+
+        # Gold Wave Transition
+        gold_points = []
+        for x in range(-100, WIDTH + 100, 10):
+            y = (310 * SCALE) + math.cos(x / (300.0 * SCALE)) * (100 * SCALE)
+            gold_points.append((x, y))
+        gold_points.extend([(WIDTH, 0), (0, 0)])
+        draw.polygon(gold_points, fill="#C5A028")
+
+        # Rich Navy Wave (Top)
+        top_points = []
+        for x in range(-100, WIDTH + 100, 10):
+            y = (295 * SCALE) + math.cos(x / (300.0 * SCALE)) * (100 * SCALE)
+            top_points.append((x, y))
+        top_points.extend([(WIDTH, 0), (0, 0)])
+        draw.polygon(top_points, fill="#001F3F")
+
+        # Flowing Ribbons Top Right
+        # Ribbon 1
+        r1 = [(1100*SCALE, 0), (WIDTH, 150*SCALE), (WIDTH, 250*SCALE), (1100*SCALE, 50*SCALE)]
+        draw.polygon(r1, fill="#D4AF37")
+        # Ribbon 2
+        r2 = [(1200*SCALE, 0), (WIDTH, 100*SCALE), (WIDTH, 180*SCALE), (1200*SCALE, 40*SCALE)]
+        draw.polygon(r2, fill="#C5A028")
+
+        # Path Definitions for Assets
         logo_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'dlklogo.png')
         if not os.path.exists(logo_path):
             logo_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'dlklogo.jpg')
         if not os.path.exists(logo_path):
             logo_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'Logo.png')
+            
+        skill_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'Skill India.png')
+        iso_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'Seal Image.png')
+        sig_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'Signature.png')
 
+        # 3. Enhanced Design Elements
+        # (Watermark removed for cleaner style)
+
+        # 4. Logos with Refined Badge Backgrounds
+        # DLK Logo (Top Left) - Enhanced for vibrancy and size
         if os.path.exists(logo_path):
             try:
+                from PIL import ImageEnhance, ImageFilter
                 logo = Image.open(logo_path).convert("RGBA")
-                logo = logo.resize((212, 82), Image.Resampling.LANCZOS)
-                img.paste(logo, (82, 76), logo)
+                
+                # 1. Enhance Quality (Increased for maximum visibility)
+                brightness = ImageEnhance.Brightness(logo).enhance(1.4)
+                contrast = ImageEnhance.Contrast(brightness).enhance(1.2)
+                sharpness = ImageEnhance.Sharpness(contrast).enhance(2.0)
+                vibrancy = ImageEnhance.Color(sharpness).enhance(1.6)
+                logo = vibrancy
+                
+                # 2. Increase size slightly
+                logo.thumbnail((int(900*SCALE), int(300*SCALE)), Image.Resampling.LANCZOS)
+                
+                lx = int(20*SCALE)
+                ly = int(20*SCALE)
+                
+                # 3. Premium Soft White Glow effect
+                glow_size = int(8 * SCALE)
+                glow = Image.new("RGBA", (logo.width + glow_size*2, logo.height + glow_size*2), (0, 0, 0, 0))
+                glow_mask = logo.split()[3]
+                glow_silhouette = Image.new("RGBA", logo.size, (255, 255, 255, 70))
+                glow.paste(glow_silhouette, (glow_size, glow_size), glow_mask)
+                glow = glow.filter(ImageFilter.GaussianBlur(glow_size))
+                img.paste(glow, (lx - glow_size, ly - glow_size), glow)
+                
+                img.paste(logo, (lx, ly), logo if logo.mode == 'RGBA' else None)
             except Exception:
-                try:
-                    logo = Image.open(logo_path).convert("RGB")
-                    logo = logo.resize((212, 82), Image.Resampling.LANCZOS)
-                    img.paste(logo, (82, 76))
-                except Exception:
-                    pass
+                pass
 
-        # Text
-        font_title = get_font("times.ttf", 52)
-        font_small = get_font("arial.ttf", 24)
-        font_name = get_font("times.ttf", 54)
-        font_course = get_font("times.ttf", 42)
-
-        draw.text((82, 247), "CERTIFICATE OF COMPLETION", font=font_title, fill="#1A1A1A")
-        draw.text((82, 335), "Presented to", font=font_small, fill="#555555")
-        draw.text((82, 382), student_name, font=font_name, fill="#0B4A8F")
-        draw.text((82, 488), "For successfully completing an online course", font=font_small, fill="#555555")
-        draw.text((82, 535), course_name, font=font_course, fill="#1A1A1A")
-        draw.text((82, 606), f"Course completed on {date_str}", font=font_small, fill="#555555")
-
-        # Skill India.png on the right above profile
-        skill_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'Skill India.png')
+        # Skill India (Top Right)
         if os.path.exists(skill_path):
             try:
                 skill_img = Image.open(skill_path).convert("RGBA")
-                skill_img = skill_img.resize((120, 120), Image.Resampling.LANCZOS)
-                img.paste(skill_img, (952, 76), skill_img)
+                # Increase size
+                skill_img.thumbnail((int(400*SCALE), int(200*SCALE)), Image.Resampling.LANCZOS)
+                sx = int(WIDTH - skill_img.width - 40*SCALE) # Match left margin
+                sy = int(40*SCALE)
+                img.paste(skill_img, (sx, sy), skill_img)
             except Exception:
                 pass
 
-        # Profile Image right
-        draw.text((930, 222), "STUDENT PROFILE", font=get_font("arial.ttf", 16), fill="#555555")
-        profile_drawn = False
-        if student.profile_photo and hasattr(student.profile_photo, 'path') and os.path.exists(student.profile_photo.path):
-            try:
-                p_img = Image.open(student.profile_photo.path).convert("RGB")
-                p_img = p_img.resize((165, 165), Image.Resampling.LANCZOS)
-                img.paste(p_img, (930, 250))
-                profile_drawn = True
-            except Exception:
-                pass
+        # 5. Main Text Content
+        # "CERTIFICATE" (with deep shadow)
+        draw.text((707*SCALE + 3, 120*SCALE + 3), "CERTIFICATE", font=font_cert, fill="#00000044", anchor="mm")
+        draw.text((707*SCALE, 120*SCALE), "CERTIFICATE", font=font_cert, fill="#C5A028", anchor="mm") # Gold Title
+        
+        # "OF ACHIEVEMENT" Pill
+        pill_coords = [(480*SCALE, 185*SCALE), (934*SCALE, 245*SCALE)]
+        draw.rounded_rectangle(pill_coords, radius=30*SCALE, fill="#003366", outline="#D4AF37", width=int(3*SCALE))
+        draw.text((707*SCALE, 215*SCALE), "OF ACHIEVEMENT", font=font_sub, fill="#FFFFFF", anchor="mm")
 
-        if not profile_drawn:
-            draw.rectangle([(930, 250), (1095, 415)], outline="#D0D0D0", width=1, fill="#EFEFEF")
-            draw.text((971, 321), "No Photo", fill="#7F8C8D", font=get_font("arial.ttf", 18))
+        # "THIS CERTIFICATE IS PROUDLY PRESENT TO"
+        draw.text((707*SCALE, 430*SCALE), "THIS CERTIFICATE IS PROUDLY PRESENT TO", font=font_present, fill="#555555", anchor="mm")
+        
+        # Student Name (Luxury Rendering with Letter Spacing)
+        name_upper = student_name.upper()
+        
+        def draw_text_spaced(draw_obj, position, text, font, spacing, fill, anchor_centered=True, stroke_width=0, stroke_fill=None):
+            total_width = 0
+            char_widths = []
+            for char in text:
+                cw = draw_obj.textlength(char, font=font)
+                char_widths.append(cw)
+                total_width += cw + (spacing if char != text[-1] else 0)
+            
+            start_x = position[0] - (total_width / 2) if anchor_centered else position[0]
+            curr_x = start_x
+            for i, char in enumerate(text):
+                draw_obj.text((curr_x, position[1]), char, font=font, fill=fill, anchor="lm", stroke_width=stroke_width, stroke_fill=stroke_fill)
+                curr_x += char_widths[i] + spacing
 
-        draw.rectangle([(928, 248), (1097, 417)], outline="#D0D0D0", width=1)
+        spacing_val = int(8 * SCALE) 
+        
+        draw_text_spaced(draw, (707*SCALE + 5, 520*SCALE + 5), name_upper, font_name, spacing_val, "#00000011")
+        draw_text_spaced(draw, (707*SCALE + 2, 520*SCALE + 2), name_upper, font_name, spacing_val, "#C5A028")
+        draw_text_spaced(draw, (707*SCALE, 520*SCALE), name_upper, font_name, spacing_val, "#000B1D", stroke_width=int(1*SCALE), stroke_fill="#000B1D")
 
-        # Seal
-        seal_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'Seal Image.png')
-        seal_drawn = False
-        if os.path.exists(seal_path):
-            try:
-                seal_img = Image.open(seal_path).convert("RGBA")
-                seal_img = seal_img.resize((165, 165), Image.Resampling.LANCZOS)
-                img.paste(seal_img, (1114, 435), seal_img)
-                seal_drawn = True
-            except Exception:
-                pass
+        # Course Name Section (Dynamic Width Fitting)
+        course_text_upper = course_name.upper()
+        tw, th = draw.textbbox((0, 0), course_text_upper, font=font_course)[2:]
+        
+        px, py = 50 * SCALE, 15 * SCALE
+        center_x = 707 * SCALE
+        center_y = 605 * SCALE
+        
+        course_banner = [
+            (center_x - (tw/2) - px, center_y - (th/2) - py),
+            (center_x + (tw/2) + px, center_y + (th/2) + py)
+        ]
+        
+        draw.rectangle(course_banner, fill="#C5A028") 
+        inner_banner = [
+            (course_banner[0][0] + 3*SCALE, course_banner[0][1] + 3*SCALE),
+            (course_banner[1][0] - 3*SCALE, course_banner[1][1] - 3*SCALE)
+        ]
+        draw.rectangle(inner_banner, outline="#001F3F", width=int(2*SCALE))
+        
+        draw.text((center_x, center_y), course_text_upper, font=font_course, fill="#000B1D", anchor="mm", stroke_width=int(1*SCALE), stroke_fill="#000B1D")
 
-        if not seal_drawn:
-            draw.ellipse([(1114, 435), (1279, 600)], outline="#0B4A8F", fill="#FFFFFF", width=4)
-            draw.text((1155, 494), "G", font=get_font("times.ttf", 61), fill="#0B4A8F")
+        # Content Text
+        aptitude_text = (
+            "This certificate is awarded for successfully completing the Aptitude and Reasoning assessment. "
+            "The candidate has demonstrated proficiency in logical reasoning, quantitative analysis, "
+            "and problem-solving capabilities essential for professional excellence."
+        )
+        lines = textwrap.wrap(aptitude_text, width=80)
+        y_text = 710 * SCALE
+        for line in lines:
+            draw.text((707*SCALE, y_text), line, font=font_content, fill="#444444", anchor="mm")
+            y_text += 42 * SCALE
 
-        # Signature
-        draw.line([(82, 759), (318, 759)], fill="#D0D0D0", width=1)
-        draw.text((82, 771), "Harish Subramanian", fill="#1A1A1A", font=get_font("arial.ttf", 19))
-        draw.text((82, 794), "Academic Director, Great Learning", fill="#555555", font=get_font("arial.ttf", 16))
-
-        sig_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'Signature.png')
+        # Website
+       
+        # 6. Signature & Date Section
         if os.path.exists(sig_path):
             try:
+                from PIL import ImageEnhance
                 sig_img = Image.open(sig_path).convert("RGBA")
-                sig_img = sig_img.resize((188, 70), Image.Resampling.LANCZOS)
-                img.paste(sig_img, (82, 682), sig_img)
+                # Increase size further
+                sig_img.thumbnail((int(750*SCALE), int(350*SCALE)), Image.Resampling.LANCZOS)
+                
+                # Make it significantly darker, bolder and more visible (Ink effect)
+                contrast_enhancer = ImageEnhance.Contrast(sig_img)
+                sig_img = contrast_enhancer.enhance(3.0) 
+                
+                brightness_enhancer = ImageEnhance.Brightness(sig_img)
+                sig_img = brightness_enhancer.enhance(0.4) 
+                
+                sharpness_enhancer = ImageEnhance.Sharpness(sig_img)
+                sig_img = sharpness_enhancer.enhance(2.5) 
+                
+                sx = int(300*SCALE - (sig_img.width // 2))
+                # Move further downward (baseline shifted to 1080)
+                sy = int(1080*SCALE - sig_img.height)
+                img.paste(sig_img, (sx, sy), sig_img)
             except Exception:
                 pass
+        
+        draw.line([(100*SCALE, 920*SCALE), (500*SCALE, 920*SCALE)], fill="#002147", width=int(1*SCALE))
+        draw.text((300*SCALE, 940*SCALE), "SIGNATURE", font=font_footer, fill="#002147", anchor="mm")
+        
+        date_now = timezone.now().strftime("%d-%m-%Y")
+        draw.line([(914*SCALE, 920*SCALE), (1314*SCALE, 920*SCALE)], fill="#002147", width=int(1*SCALE))
+        draw.text((1114*SCALE, 940*SCALE), f"DATE: {date_now}", font=font_footer, fill="#002147", anchor="mm")
+
+        # 7. Fixed ISO Seal & Professional Badge
+        if os.path.exists(iso_path):
+            try:
+                # Draw professional ribbon with notched bottom
+                ribbon_pts = [(1140*SCALE, 300*SCALE), (1300*SCALE, 300*SCALE), (1300*SCALE, 600*SCALE), (1220*SCALE, 550*SCALE), (1140*SCALE, 600*SCALE)]
+                draw.polygon(ribbon_pts, fill="#000B1D") # Deeper Navy
+                draw.polygon(ribbon_pts, outline="#C5A028", width=int(2*SCALE))
+                
+                # Draw the "Yellow Circular Badge" base
+                seal_center = (1220*SCALE, 420*SCALE)
+                seal_radius = 120*SCALE
+                # Outer gold circle
+                draw.ellipse([(seal_center[0]-seal_radius, seal_center[1]-seal_radius), (seal_center[0]+seal_radius, seal_center[1]+seal_radius)], fill="#C5A028", outline="#8B7500", width=int(3*SCALE))
+                # Inner gold ring
+                draw.ellipse([(seal_center[0]-seal_radius+8*SCALE, seal_center[1]-seal_radius+8*SCALE), (seal_center[0]+seal_radius-8*SCALE, seal_center[1]+seal_radius-8*SCALE)], outline="#F9E79F", width=int(2*SCALE))
+                
+                iso_img = Image.open(iso_path).convert("RGBA")
+                # 1. Remove transparent padding
+                bbox = iso_img.getbbox()
+                if bbox:
+                    iso_img = iso_img.crop(bbox)
+                
+                # 2. Force to Square to prevent distortion
+                w, h = iso_img.size
+                sq_size = max(w, h)
+                square_iso = Image.new("RGBA", (sq_size, sq_size), (0, 0, 0, 0))
+                square_iso.paste(iso_img, ((sq_size - w) // 2, (sq_size - h) // 2))
+                
+                # 3. Resize to fit perfectly inside the yellow circle without overflowing
+                # Using 2.8x multiplier to ensure the seal stays within the gold circle boundaries
+                iso_final_size = int(seal_radius * 2.8)
+                iso_img_final = square_iso.resize((iso_final_size, iso_final_size), Image.Resampling.LANCZOS)
+                
+                # 4. Perfect Centering with corrective nudge (adjusted for perceived center and user feedback)
+                # Compensation for asset asymmetry and custom positioning
+                nudge_x = 36 * SCALE
+                nudge_y = -4 * SCALE
+                paste_x = int(round(seal_center[0] - (iso_final_size / 2.0) - nudge_x))
+                paste_y = int(round(seal_center[1] - (iso_final_size / 2.0) - nudge_y))
+                img.paste(iso_img_final, (paste_x, paste_y), iso_img_final)
+            except Exception:
+                pass
+
+        # Final 3px Border
+        draw.rectangle([(0, 0), (WIDTH-1, HEIGHT-1)], outline="#C5A028", width=int(3*SCALE))
 
         # Return as PNG direct response
         response = HttpResponse(content_type="image/png")
         img.save(response, "PNG")
         return response
+

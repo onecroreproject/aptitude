@@ -72,7 +72,8 @@
               <div style="display: flex; gap: 8px;">
                 <a href="{% url 'admin_view_question' q.pk %}" class="btn-action btn-view" title="View Details">👁️</a>
                 <a href="{% url 'admin_edit_question' q.pk %}" class="btn-action btn-edit" title="Edit Question">✏️</a>
-                <form action="{% url 'admin_delete_question' q.pk %}" method="POST" onsubmit="return confirm('Delete this question?');" style="display: inline;">
+                <form action="{% url 'admin_delete_question' q.pk %}" method="POST" 
+                      onsubmit="confirmAction({event: event, title: 'Delete Question?', text: 'This question will be permanently removed from the bank.', confirmButtonText: 'Yes, Delete', callback: () => this.submit()});" style="display: inline;">
                   {% csrf_token %}
                   <button type="submit" class="btn-action btn-delete" title="Delete Question">🗑️</button>
                 </form>

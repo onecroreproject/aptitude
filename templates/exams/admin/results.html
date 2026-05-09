@@ -18,6 +18,15 @@
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
         <div class="card-title">All Results</div>
         
+        <div style="display: flex; gap: 12px; align-items: center;">
+            <a href="{% url 'export_results_excel' %}?search={{ search }}&status={{ current_status }}&min_percentage={{ min_percentage }}" class="btn btn-outline btn-sm">
+                📊 Export Excel
+            </a>
+            <a href="{% url 'export_results_pdf' %}?search={{ search }}&status={{ current_status }}&min_percentage={{ min_percentage }}" class="btn btn-outline btn-sm">
+                📄 Export PDF
+            </a>
+        </div>
+        
         <form method="GET" style="display: flex; gap: 12px; flex: 1; max-width: 600px;">
             <input type="text" name="search" class="form-input" placeholder="Search by student name..." value="{{ search }}" style="flex: 2; min-width: 160px;">
             <input type="number" name="min_percentage" class="form-input" placeholder="Min %..." value="{{ min_percentage }}" style="flex: 1; min-width: 90px;" min="0" max="100">
@@ -32,44 +41,64 @@
         </form>
     </div>
 
-    <div class="table-container">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Student</th>
-                    <th>Category</th>
-                    <th>Score</th>
-                    <th>Percentage</th>
-                    <th>Status</th>
-                    <th>Date</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for r in results %}
-                <tr>
-                    <td style="font-weight: 700;">{{ r.student.username }}</td>
-                    <td>{{ r.exam_paper.category.name }}</td>
-                    <td style="font-weight: 600;">{{ r.total_marks_obtained|floatformat:0 }} / {{ r.total_marks_possible }}</td>
-                    <td>
-                        <span class="badge {% if r.is_passed %}badge-approved{% else %}badge-rejected{% endif %}" style="font-weight: 700;">
-                            {{ r.percentage }}%
-                        </span>
-                    </td>
-                    <td><span class="badge badge-{{ r.status|lower }}">{{ r.status }}</span></td>
-                    <td style="font-size: 12px; color: var(--text-muted);">{{ r.started_at|date:"M d, Y" }}</td>
-                    <td><a href="{% url 'admin_result_detail' r.id %}" class="btn btn-outline btn-sm">View Report</a></td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 48px;">
-                        No exam results found matching your criteria.
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+    <form id="bulk-delete-form" action="{% url 'admin_bulk_delete_results' %}" method="POST" 
+          onsubmit="confirmAction({event: event, title: 'Delete Selected Results?', text: 'These results will be permanently removed from the database.', confirmButtonText: 'Yes, Delete All', callback: () => this.submit()});">
+        {% csrf_token %}
+        <div style="margin-bottom: 12px; display: none;" id="bulk-actions-bar">
+            <button type="submit" class="btn btn-rejected btn-sm">🗑️ Delete Selected</button>
+        </div>
+
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 40px;"><input type="checkbox" id="select-all"></th>
+                        <th>Student</th>
+                        <th>Category</th>
+                        <th>Score</th>
+                        <th>Percentage</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in results %}
+                    <tr>
+                        <td><input type="checkbox" name="selected_ids" value="{{ r.id }}" class="record-checkbox"></td>
+                        <td style="font-weight: 700;">{{ r.student.username }}</td>
+                        <td>{{ r.exam_paper.category.name }}</td>
+                        <td style="font-weight: 600;">{{ r.total_marks_obtained|floatformat:0 }} / {{ r.total_marks_possible }}</td>
+                        <td>
+                            <span class="badge {% if r.is_passed %}badge-approved{% else %}badge-rejected{% endif %}" style="font-weight: 700;">
+                                {{ r.percentage }}%
+                            </span>
+                        </td>
+                        <td><span class="badge badge-{{ r.status|lower }}">{{ r.status }}</span></td>
+                        <td style="font-size: 12px; color: var(--text-muted);">{{ r.started_at|date:"M d, Y" }}</td>
+                        <td>
+                            <div style="display: flex; gap: 8px;">
+                                <a href="{% url 'admin_result_detail' r.id %}" class="btn btn-outline btn-sm" title="View Report">Report</a>
+                                <button type="button" onclick="confirmDelete('{{ r.id }}', '{{ r.student.username }}')" class="btn btn-outline btn-sm" style="color: var(--accent-rejected); border-color: var(--accent-rejected);">🗑️</button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 48px;">
+                            No exam results found matching your criteria.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+
+    <!-- Individual delete form (hidden) -->
+    <form id="single-delete-form" method="POST" style="display: none;">
+        {% csrf_token %}
+    </form>
 
     {% if is_paginated %}
     <div style="margin-top: 24px; display: flex; justify-content: center; gap: 8px;">
@@ -83,4 +112,43 @@
     </div>
     {% endif %}
 </div>
+
+<script>
+    const selectAll = document.getElementById('select-all');
+    const checkboxes = document.querySelectorAll('.record-checkbox');
+    const bulkBar = document.getElementById('bulk-actions-bar');
+
+    function updateBulkBar() {
+        const checkedCount = document.querySelectorAll('.record-checkbox:checked').length;
+        bulkBar.style.display = checkedCount > 0 ? 'block' : 'none';
+    }
+
+    selectAll.addEventListener('change', () => {
+        checkboxes.forEach(cb => {
+            cb.checked = selectAll.checked;
+        });
+        updateBulkBar();
+    });
+
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', () => {
+            updateBulkBar();
+            if (!cb.checked) selectAll.checked = false;
+            if (document.querySelectorAll('.record-checkbox:checked').length === checkboxes.length) selectAll.checked = true;
+        });
+    });
+
+    function confirmDelete(id, name) {
+        confirmAction({
+            title: 'Delete Result?',
+            text: `Permanently delete exam result for "${name}"?`,
+            confirmButtonText: 'Yes, Delete',
+            callback: () => {
+                const form = document.getElementById('single-delete-form');
+                form.action = `/admin-panel/results/${id}/delete/`;
+                form.submit();
+            }
+        });
+    }
+</script>
 {% endblock %}

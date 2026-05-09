@@ -21,7 +21,8 @@
         <div style="flex: 1;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
                 <div style="font-size: 24px;">{{ student.name|default:student.username }}</div>
-                <form action="{% url 'admin_delete_student' student.id %}" method="POST" onsubmit="return confirm('Permanently remove this student? All history will be deleted.');" style="display:inline;">
+                <form action="{% url 'admin_delete_student' student.id %}" method="POST" 
+                      onsubmit="confirmAction({event: event, title: 'Remove Student?', text: 'Permanently remove this student? All history will be deleted.', confirmButtonText: 'Yes, Delete All', callback: () => this.submit()});" style="display:inline;">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-outline" style="color: var(--accent-danger); border-color: var(--accent-danger); padding: 8px 16px; font-size: 13px;">
                         🗑️ Delete Student

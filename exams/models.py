@@ -305,7 +305,7 @@ class Question(models.Model):
     # ── Classification ───────────────────────────
     category = models.ForeignKey(
         'Category',
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
         related_name='questions',
         db_index=True,
         null=True, # For existing records during migration

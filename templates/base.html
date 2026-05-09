@@ -271,6 +271,105 @@
   </script>
 
   {% block extra_js %}{% endblock %}
+
+  <!-- Premium Modal System -->
+  <style>
+    /* SweetAlert2 Premium Theme (Royal Blue & Gold) */
+    .premium-swal-popup {
+      border-radius: 16px !important;
+      background: rgba(255, 255, 255, 0.95) !important;
+      backdrop-filter: blur(10px) !important;
+      border: 1px solid rgba(212, 175, 55, 0.3) !important;
+      box-shadow: 0 20px 40px rgba(0, 31, 63, 0.15) !important;
+    }
+    .premium-swal-title {
+      color: #001F3F !important;
+      font-weight: 800 !important;
+      font-family: 'Inter', sans-serif !important;
+    }
+    .premium-swal-content {
+      color: #555 !important;
+      font-size: 15px !important;
+    }
+    .premium-swal-confirm {
+      background-color: #001F3F !important;
+      border-radius: 8px !important;
+      padding: 12px 24px !important;
+      font-weight: 600 !important;
+    }
+    .premium-swal-cancel {
+      border-radius: 8px !important;
+      padding: 12px 24px !important;
+      font-weight: 600 !important;
+    }
+    .colored-toast {
+      border-radius: 12px !important;
+    }
+  </style>
+
+  <script>
+    // Global Premium Modal Helper
+    window.confirmAction = function(options) {
+      const {
+        title = 'Are you sure?',
+        text = "This action cannot be undone.",
+        icon = 'warning',
+        confirmButtonText = 'Yes, proceed',
+        cancelButtonText = 'Cancel',
+        callback = null,
+        event = null
+      } = options;
+
+      if (event) event.preventDefault();
+
+      Swal.fire({
+        title: title,
+        text: text,
+        icon: icon,
+        showCancelButton: true,
+        confirmButtonColor: '#001F3F',
+        cancelButtonColor: '#d33',
+        confirmButtonText: confirmButtonText,
+        cancelButtonText: cancelButtonText,
+        customClass: {
+          popup: 'premium-swal-popup',
+          title: 'premium-swal-title',
+          htmlContainer: 'premium-swal-content',
+          confirmButton: 'premium-swal-confirm',
+          cancelButton: 'premium-swal-cancel'
+        },
+        showClass: {
+          popup: 'animate__animated animate__fadeInDown animate__faster'
+        },
+        hideClass: {
+          popup: 'animate__animated animate__fadeOutUp animate__faster'
+        }
+      }).then((result) => {
+        if (result.isConfirmed && callback) {
+          callback();
+        }
+      });
+    };
+
+    // Override Default Browser Dialogs
+    window.originalAlert = window.alert;
+    window.alert = function(message) {
+      Swal.fire({
+        title: 'Notification',
+        text: message,
+        icon: 'info',
+        confirmButtonColor: '#001F3F',
+        customClass: {
+          popup: 'premium-swal-popup',
+          title: 'premium-swal-title',
+          confirmButton: 'premium-swal-confirm'
+        }
+      });
+    };
+
+    // Note: window.confirm cannot be truly overridden synchronously. 
+    // We will use confirmAction helper instead for all project calls.
+  </script>
 </body>
 
 </html>

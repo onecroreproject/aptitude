@@ -89,21 +89,42 @@
   };
 
   function approveSingle(reqId) {
-    if (confirm('Approve this request and generate paper?')) {
-      const form = document.getElementById('approveForm');
-      form.action = `/admin-panel/requests/${reqId}/approve/`;
-      form.submit();
-    }
+    confirmAction({
+      title: 'Approve Request?',
+      text: 'Do you want to approve this request and generate the exam paper?',
+      confirmButtonText: 'Yes, Approve',
+      callback: () => {
+        const form = document.getElementById('approveForm');
+        form.action = `/admin-panel/requests/${reqId}/approve/`;
+        form.submit();
+      }
+    });
   }
 
   function rejectSingle(reqId) {
-    const reason = prompt('Enter rejection reason:');
-    if (reason !== null) {
-      const form = document.getElementById('rejectForm');
-      form.action = `/admin-panel/requests/${reqId}/reject/`;
-      document.getElementById('rejectReasonField').value = reason;
-      form.submit();
-    }
+    Swal.fire({
+      title: 'Reject Request',
+      text: 'Enter rejection reason:',
+      input: 'text',
+      inputPlaceholder: 'Reason for rejection...',
+      showCancelButton: true,
+      confirmButtonColor: '#001F3F',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Confirm Reject',
+      customClass: {
+        popup: 'premium-swal-popup',
+        title: 'premium-swal-title',
+        confirmButton: 'premium-swal-confirm',
+        cancelButton: 'premium-swal-cancel'
+      }
+    }).then((result) => {
+      if (result.isConfirmed && result.value !== null) {
+        const form = document.getElementById('rejectForm');
+        form.action = `/admin-panel/requests/${reqId}/reject/`;
+        document.getElementById('rejectReasonField').value = result.value;
+        form.submit();
+      }
+    });
   }
 
   function showBulkReject() {
