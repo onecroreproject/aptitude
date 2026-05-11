@@ -1,0 +1,9 @@
+{% extends 'errors/base.html' %}
+
+{% block error_code %}400{% endblock %}
+{% block error_code_display %}400{% endblock %}
+{% block illustration %}⚠️{% endblock %}
+{% block error_title_display %}Bad Request{% endblock %}
+{% block error_message_display %}
+    The server could not understand the request due to invalid syntax. Please try again or refresh the page.
+{% endblock %}

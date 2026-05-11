@@ -38,7 +38,7 @@
       </div>
 
       <nav class="sidebar-nav">
-        {% if user.is_superuser %}
+        {% if user.is_superuser or user.role == 'Sub Admin' %}
         <a href="{% url 'admin_dashboard' %}"
           class="nav-link {% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}">📊
           Dashboard</a>
@@ -50,6 +50,10 @@
           class="nav-link {% if 'request' in request.resolver_match.url_name %}active{% endif %}">⚖️ Requests</a>
         <a href="{% url 'admin_results' %}"
           class="nav-link {% if 'result' in request.resolver_match.url_name %}active{% endif %}">🏅 Results</a>
+        {% if user.is_superuser %}
+        <a href="{% url 'admin_subadmins' %}"
+          class="nav-link {% if 'subadmin' in request.resolver_match.url_name %}active{% endif %}">🛡️ Sub Admins</a>
+        {% endif %}
         {% else %}
         <a href="{% url 'student_dashboard' %}"
           class="nav-link {% if request.resolver_match.url_name == 'student_dashboard' %}active{% endif %}">🏠

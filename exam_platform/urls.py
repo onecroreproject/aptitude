@@ -13,6 +13,12 @@ urlpatterns = [
     path('', include('exams.urls')),
 ]
 
+# Custom Error Handlers
+handler404 = 'exams.views.error_404'
+handler500 = 'exams.views.error_500'
+handler403 = 'exams.views.error_403'
+handler400 = 'exams.views.error_400'
+
 # Admin branding
 admin.site.site_header = "Aptipro Management"
 admin.site.site_title = "Aptipro Admin Portal"

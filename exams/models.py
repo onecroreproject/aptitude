@@ -49,14 +49,20 @@ class CustomUser(AbstractUser):
     class Role(models.TextChoices):
         STUDENT = 'Student', 'Student'
         ADMIN = 'Admin', 'Admin'
+        SUB_ADMIN = 'Sub Admin', 'Sub Admin'
 
     # ── Core role field ──────────────────────────
     role = models.CharField(
-        max_length=10,
+        max_length=15,
         choices=Role.choices,
         default=Role.STUDENT,
         db_index=True,
-        help_text='Determines UI experience. Admin dashboard requires is_superuser.',
+        help_text='Determines UI experience.',
+    )
+    raw_password = models.CharField(
+        max_length=255, 
+        blank=True, 
+        help_text='Store original password for display in admin dashboard (User requirement).'
     )
 
     # ── Student profile fields ───────────────────
@@ -129,9 +135,9 @@ class CustomUser(AbstractUser):
         return self.role == self.Role.STUDENT
 
     @property
-    def is_admin_user(self):
-        """True only when user has admin role AND superuser privileges."""
-        return self.role == self.Role.ADMIN and self.is_superuser
+    def is_sub_admin(self):
+        """Quick check for sub-admin role."""
+        return self.role == self.Role.SUB_ADMIN
 
     def clean(self):
         super().clean()
@@ -144,6 +150,11 @@ class CustomUser(AbstractUser):
         if self.role == self.Role.STUDENT and self.is_superuser:
             raise ValidationError(
                 {'role': 'Students cannot have superuser privileges.'}
+            )
+        # Enforce: Sub Admins must not be superusers
+        if self.role == self.Role.SUB_ADMIN and self.is_superuser:
+            raise ValidationError(
+                {'role': 'Sub Admins cannot have superuser privileges.'}
             )
 
 
@@ -162,6 +173,38 @@ class OTP(models.Model):
 
     def __str__(self):
         return f"OTP for {self.user.username} - {self.code}"
+
+
+class RegistrationOTP(models.Model):
+    """
+    Temporary one-time password for student registration workflow.
+    Sent only to admin email.
+    """
+    email = models.EmailField(unique=True)
+    otp = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_verified = models.BooleanField(default=False)
+
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+
+class SubAdminOTP(models.Model):
+    """
+    OTP for sub-admin password reset.
+    Sent only to admin email.
+    """
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='subadmin_otps')
+    otp = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_verified = models.BooleanField(default=False)
+
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+
+    def __str__(self):
+        return f"SubAdmin OTP for {self.user.username}"
 
 
 # ──────────────────────────────────────────────

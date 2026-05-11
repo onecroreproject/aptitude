@@ -29,11 +29,24 @@ class SuperuserRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
         return redirect('student_dashboard')
 
 
+class BaseAdminRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
+    """
+    Restricts access to either Superusers (Admin) or Sub Admins.
+    Used for general dashboard views.
+    """
+    def test_func(self):
+        user = self.request.user
+        return user.is_authenticated and (user.is_superuser or user.role == 'Sub Admin')
+
+    def handle_no_permission(self):
+        if not self.request.user.is_authenticated:
+            return redirect('login')
+        return redirect('student_dashboard')
+
+
 class StudentRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
     """
     Restricts view access to authenticated students only.
-
-    Superusers are redirected to the admin dashboard instead.
     """
 
     def test_func(self):
@@ -43,6 +56,6 @@ class StudentRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
     def handle_no_permission(self):
         if not self.request.user.is_authenticated:
             return redirect('login')
-        if self.request.user.is_superuser:
+        if self.request.user.is_superuser or self.request.user.role == 'Sub Admin':
             return redirect('admin_dashboard')
         return redirect('login')

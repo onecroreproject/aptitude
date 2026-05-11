@@ -21,6 +21,7 @@
         <div style="flex: 1;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
                 <div style="font-size: 24px;">{{ student.name|default:student.username }}</div>
+                {% if user.is_superuser %}
                 <form action="{% url 'admin_delete_student' student.id %}" method="POST" 
                       onsubmit="confirmAction({event: event, title: 'Remove Student?', text: 'Permanently remove this student? All history will be deleted.', confirmButtonText: 'Yes, Delete All', callback: () => this.submit()});" style="display:inline;">
                     {% csrf_token %}
@@ -28,6 +29,7 @@
                         🗑️ Delete Student
                     </button>
                 </form>
+                {% endif %}
             </div>
             <div style="font-size: 14px; color: var(--text-secondary); font-weight: 400;">Joined on {{ student.date_joined|date:"M d, Y" }}</div>
         </div>

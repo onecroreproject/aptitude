@@ -32,8 +32,9 @@ from .forms import (
     ForgotPasswordForm,
     OTPVerificationForm,
     ResetPasswordForm,
+    SubAdminForm,
 )
-from .mixins import SuperuserRequiredMixin, StudentRequiredMixin
+from .mixins import SuperuserRequiredMixin, StudentRequiredMixin, BaseAdminRequiredMixin
 from .models import (
     CustomUser,
     Category,
@@ -45,6 +46,8 @@ from .models import (
     ExamRequest,
     Notification,
     OTP,
+    RegistrationOTP,
+    SubAdminOTP,
 )
 from .utils import import_questions_from_excel, generate_exam_paper, submit_and_evaluate
 
@@ -58,7 +61,9 @@ class RegisterView(View):
 
     def dispatch(self, request, *args, **kwargs):
         if request.user.is_authenticated:
-            return redirect('student_dashboard' if not request.user.is_superuser else 'admin_dashboard')
+            if request.user.is_superuser or request.user.role == CustomUser.Role.SUB_ADMIN:
+                return redirect('admin_dashboard')
+            return redirect('student_dashboard')
         response = super().dispatch(request, *args, **kwargs)
         response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         response['Pragma'] = 'no-cache'
@@ -72,11 +77,179 @@ class RegisterView(View):
     def post(self, request):
         form = StudentRegistrationForm(request.POST, request.FILES)
         if form.is_valid():
-            user = form.save()
-            login(request, user)
-            messages.success(request, 'Registration successful! Welcome aboard.')
-            return redirect('student_dashboard')
+            # Ensure no existing inactive user blocks this registration
+            email = form.cleaned_data.get('email')
+            CustomUser.objects.filter(email=email, is_active=False).delete()
+            
+            # Save user but keep them inactive until OTP verification
+            user = form.save(commit=False)
+            user.is_active = False
+            user.save()
+            
+            # Generate 6-digit random OTP
+            import random
+            otp_code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+            
+            # Save Registration OTP to DB
+            from django.utils import timezone
+            RegistrationOTP.objects.filter(email=user.email).delete() # Remove any previous OTPs for this email
+            RegistrationOTP.objects.create(
+                email=user.email, 
+                otp=otp_code,
+                expires_at=timezone.now() + timezone.timedelta(minutes=5)
+            )
+            
+            # Send Email ONLY to Admin
+            subject = "New Student Registration - OTP Verification"
+            message = f"Hello Admin,\n\nA new student has registered:\nUsername: {user.username}\nEmail: {user.email}\n\nPlease share this OTP with the student manually: {otp_code}\n\nThis OTP is valid for 5 minutes.\n\nRegards,\nAptipro System"
+            
+            try:
+                send_mail(
+                    subject,
+                    message,
+                    settings.DEFAULT_FROM_EMAIL,
+                    [settings.ADMIN_EMAIL],
+                    fail_silently=False,
+                )
+                request.session['reg_email'] = user.email
+                messages.success(request, 'Registration initiated! Please enter the OTP shared by the administrator to complete your registration.')
+                return redirect('verify_registration_otp')
+            except Exception as e:
+                messages.error(request, f"Failed to notify admin. Error: {str(e)}")
+                # Even if mail fails, we still need verification, but it's a problem if admin doesn't get it.
+                return redirect('verify_registration_otp')
         return render(request, 'exams/register.html', {'form': form})
+
+
+class VerifyRegistrationOTPView(View):
+    """View for students to enter the registration OTP shared by the admin."""
+    def get(self, request):
+        if 'reg_email' not in request.session:
+            return redirect('register')
+        form = OTPVerificationForm()
+        return render(request, 'exams/verify_registration_otp.html', {'form': form})
+
+    def post(self, request):
+        if 'reg_email' not in request.session:
+            return redirect('register')
+        
+        email = request.session['reg_email']
+        form = OTPVerificationForm(request.POST)
+        
+        if form.is_valid():
+            code = form.cleaned_data['code']
+            otp_obj = RegistrationOTP.objects.filter(email=email, otp=code, is_verified=False).last()
+            
+            if not otp_obj:
+                messages.error(request, "Invalid OTP.")
+            elif otp_obj.is_expired():
+                messages.error(request, "OTP expired.")
+            else:
+                # Success
+                otp_obj.is_verified = True
+                otp_obj.save()
+                
+                # Activate user
+                user = get_object_or_404(CustomUser, email=email)
+                user.is_active = True
+                user.save()
+                
+                # Log them in
+                login(request, user)
+                
+                # Delete OTP as it's single use
+                otp_obj.delete()
+                
+                # Clean up session
+                del request.session['reg_email']
+                
+                messages.success(request, 'Registration complete! Welcome to Aptipro.')
+                return redirect('student_dashboard')
+                
+        return render(request, 'exams/verify_registration_otp.html', {'form': form})
+
+
+# ════════════════════════════════════════════════
+#  OTP API ENDPOINTS (FOR FETCH API)
+# ════════════════════════════════════════════════
+
+class SendRegistrationOTPAPI(View):
+    """API endpoint to resend registration OTP to admin."""
+    def post(self, request):
+        email = request.POST.get('email') or request.session.get('reg_email')
+        if not email:
+            return JsonResponse({'status': 'error', 'message': 'Email required.'}, status=400)
+            
+        user = CustomUser.objects.filter(email=email, is_active=False).first()
+        if not user:
+            return JsonResponse({'status': 'error', 'message': 'User not found or already active.'}, status=404)
+
+        # Generate new OTP
+        import random
+        otp_code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+        
+        from django.utils import timezone
+        RegistrationOTP.objects.filter(email=email).delete()
+        RegistrationOTP.objects.create(
+            email=email, 
+            otp=otp_code,
+            expires_at=timezone.now() + timezone.timedelta(minutes=5)
+        )
+        
+        # Send Email to Admin
+        subject = "Resent Registration OTP"
+        message = f"Hello Admin,\n\nA new student registration OTP has been requested:\nUsername: {user.username}\nEmail: {user.email}\n\nOTP: {otp_code}\n\nRegards,\nAptipro System"
+        
+        try:
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL,
+                [settings.ADMIN_EMAIL],
+                fail_silently=False,
+            )
+            return JsonResponse({'status': 'success', 'message': 'OTP sent to administrator.'})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': f'Failed to send email: {str(e)}'}, status=500)
+
+
+class VerifyRegistrationOTPAPI(View):
+    """API endpoint to verify registration OTP."""
+    def post(self, request):
+        try:
+            data = json.loads(request.body)
+            email = data.get('email') or request.session.get('reg_email')
+            code = data.get('code')
+        except:
+            email = request.POST.get('email') or request.session.get('reg_email')
+            code = request.POST.get('code')
+
+        if not email or not code:
+            return JsonResponse({'status': 'error', 'message': 'Email and code are required.'}, status=400)
+
+        otp_obj = RegistrationOTP.objects.filter(email=email, otp=code, is_verified=False).last()
+        
+        if not otp_obj:
+            return JsonResponse({'status': 'error', 'message': 'Invalid OTP.'}, status=400)
+        
+        if otp_obj.is_expired():
+            return JsonResponse({'status': 'error', 'message': 'OTP expired.'}, status=400)
+
+        # Success
+        user = CustomUser.objects.filter(email=email, is_active=False).first()
+        if not user:
+            return JsonResponse({'status': 'error', 'message': 'User not found or already active.'}, status=404)
+
+        user.is_active = True
+        user.save()
+        
+        login(request, user)
+        otp_obj.delete()
+        
+        if 'reg_email' in request.session:
+            del request.session['reg_email']
+            
+        return JsonResponse({'status': 'success', 'message': 'Verification successful!'})
 
 
 class LoginView(View):
@@ -84,7 +257,9 @@ class LoginView(View):
 
     def dispatch(self, request, *args, **kwargs):
         if request.user.is_authenticated:
-            return redirect('student_dashboard' if not request.user.is_superuser else 'admin_dashboard')
+            if request.user.is_superuser or request.user.role == CustomUser.Role.SUB_ADMIN:
+                return redirect('admin_dashboard')
+            return redirect('student_dashboard')
         response = super().dispatch(request, *args, **kwargs)
         response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         response['Pragma'] = 'no-cache'
@@ -101,7 +276,9 @@ class LoginView(View):
             user = form.get_user()
             login(request, user)
             messages.success(request, f'Welcome back, {user.username}!')
-            if user.is_superuser:
+            
+            # Redirect based on role/permissions
+            if user.is_superuser or user.role == CustomUser.Role.SUB_ADMIN:
                 return redirect('admin_dashboard')
             return redirect('student_dashboard')
         return render(request, 'exams/login.html', {'form': form})
@@ -235,6 +412,131 @@ class ResetPasswordView(View):
             return redirect('login')
             
         return render(request, 'exams/reset_password.html', {'form': form})
+
+
+# ════════════════════════════════════════════════
+#  SUB-ADMIN AUTHENTICATION (FORGOT PASSWORD)
+# ════════════════════════════════════════════════
+
+class SubAdminForgotPasswordView(View):
+    """Sub-Admins enter their email, OTP goes ONLY to ADMIN."""
+    def get(self, request):
+        form = ForgotPasswordForm()
+        return render(request, 'exams/subadmin/forgot_password.html', {'form': form})
+
+    def post(self, request):
+        form = ForgotPasswordForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data['email']
+            user = CustomUser.objects.filter(email=email, role=CustomUser.Role.SUB_ADMIN).first()
+            
+            if user:
+                # Generate OTP
+                import random
+                otp_code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+                
+                # Save OTP
+                SubAdminOTP.objects.filter(user=user).delete()
+                SubAdminOTP.objects.create(
+                    user=user, 
+                    otp=otp_code,
+                    expires_at=timezone.now() + timezone.timedelta(minutes=5)
+                )
+                
+                # Send Email ONLY to Admin
+                subject = "Sub-Admin Password Reset Request"
+                message = f"Hello Admin,\n\nSub-Admin '{user.username}' has requested a password reset.\n\nPlease share this OTP with them manually: {otp_code}\n\nRegards,\nAptipro System"
+                
+                try:
+                    send_mail(
+                        subject,
+                        message,
+                        settings.DEFAULT_FROM_EMAIL,
+                        [settings.ADMIN_EMAIL],
+                        fail_silently=False,
+                    )
+                    request.session['subadmin_reset_email'] = email
+                    messages.success(request, "A reset request has been sent to the Administrator. Please contact them for your OTP.")
+                    return redirect('subadmin_verify_otp')
+                except Exception as e:
+                    messages.error(request, f"Failed to notify admin: {str(e)}")
+            else:
+                messages.error(request, "No sub-admin found with this email.")
+                
+        return render(request, 'exams/subadmin/forgot_password.html', {'form': form})
+
+
+class SubAdminVerifyOTPView(View):
+    """Step 2 for Sub-Admin password reset."""
+    def get(self, request):
+        if 'subadmin_reset_email' not in request.session:
+            return redirect('subadmin_forgot_password')
+        form = OTPVerificationForm()
+        return render(request, 'exams/subadmin/verify_otp.html', {'form': form})
+
+    def post(self, request):
+        if 'subadmin_reset_email' not in request.session:
+            return redirect('subadmin_forgot_password')
+        
+        email = request.session['subadmin_reset_email']
+        user = get_object_or_404(CustomUser, email=email, role=CustomUser.Role.SUB_ADMIN)
+        form = OTPVerificationForm(request.POST)
+        
+        if form.is_valid():
+            code = form.cleaned_data['code']
+            otp_obj = SubAdminOTP.objects.filter(user=user, otp=code, is_verified=False).last()
+            
+            if otp_obj and not otp_obj.is_expired():
+                otp_obj.is_verified = True
+                otp_obj.save()
+                messages.success(request, "OTP verified. You can now set a new password.")
+                return redirect('subadmin_reset_password')
+            else:
+                messages.error(request, "Invalid or expired OTP.")
+                
+        return render(request, 'exams/subadmin/verify_otp.html', {'form': form})
+
+
+class SubAdminResetPasswordView(View):
+    """Step 3 for Sub-Admin password reset."""
+    def get(self, request):
+        if 'subadmin_reset_email' not in request.session:
+            return redirect('subadmin_forgot_password')
+        
+        email = request.session['subadmin_reset_email']
+        user = get_object_or_404(CustomUser, email=email, role=CustomUser.Role.SUB_ADMIN)
+        otp_obj = SubAdminOTP.objects.filter(user=user, is_verified=True).last()
+        if not otp_obj:
+            return redirect('subadmin_verify_otp')
+
+        form = ResetPasswordForm()
+        return render(request, 'exams/subadmin/reset_password.html', {'form': form})
+
+    def post(self, request):
+        if 'subadmin_reset_email' not in request.session:
+            return redirect('subadmin_forgot_password')
+        
+        email = request.session['subadmin_reset_email']
+        user = get_object_or_404(CustomUser, email=email, role=CustomUser.Role.SUB_ADMIN)
+        otp_obj = SubAdminOTP.objects.filter(user=user, is_verified=True).last()
+        if not otp_obj:
+            return redirect('subadmin_verify_otp')
+
+        form = ResetPasswordForm(request.POST)
+        if form.is_valid():
+            new_password = form.cleaned_data['password']
+            user.set_password(new_password)
+            user.raw_password = new_password # Update raw password for admin visibility
+            user.save()
+            
+            # Clean up
+            otp_obj.delete()
+            del request.session['subadmin_reset_email']
+            
+            messages.success(request, "Password reset successful. You can now log in.")
+            return redirect('login')
+            
+        return render(request, 'exams/subadmin/reset_password.html', {'form': form})
 
 
 @login_required
@@ -579,10 +881,101 @@ class DeleteNotificationView(LoginRequiredMixin, View):
 
 
 # ════════════════════════════════════════════════
+#  SUB-ADMIN MANAGEMENT (SUPERUSER ONLY)
+# ════════════════════════════════════════════════
+
+class AdminSubAdminsView(SuperuserRequiredMixin, ListView):
+    """List all Sub-Admins."""
+    template_name = 'exams/admin/subadmins.html'
+    context_object_name = 'subadmins'
+    
+    def get_queryset(self):
+        return CustomUser.objects.filter(role=CustomUser.Role.SUB_ADMIN).order_by('-date_joined')
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['form'] = SubAdminForm()
+        return ctx
+
+
+class AdminAddSubAdminView(SuperuserRequiredMixin, View):
+    """Add a new Sub-Admin."""
+    def post(self, request):
+        form = SubAdminForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Sub-Admin created successfully.")
+        else:
+            # Handle errors (e.g. username taken)
+            error_msg = list(form.errors.values())[0][0]
+            messages.error(request, f"Error: {error_msg}")
+        return redirect('admin_subadmins')
+
+
+class AdminEditSubAdminView(SuperuserRequiredMixin, View):
+    """Edit an existing Sub-Admin."""
+    def post(self, request, pk):
+        subadmin = get_object_or_404(CustomUser, pk=pk, role=CustomUser.Role.SUB_ADMIN)
+        form = SubAdminForm(request.POST, instance=subadmin)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Sub-Admin updated successfully.")
+        else:
+            error_msg = list(form.errors.values())[0][0]
+            messages.error(request, f"Error: {error_msg}")
+        return redirect('admin_subadmins')
+
+
+class AdminDeleteSubAdminView(SuperuserRequiredMixin, View):
+    """Delete a Sub-Admin."""
+    def post(self, request, pk):
+        subadmin = get_object_or_404(CustomUser, pk=pk, role=CustomUser.Role.SUB_ADMIN)
+        username = subadmin.username
+        subadmin.delete()
+        messages.success(request, f"Sub-Admin '{username}' deleted successfully.")
+        return redirect('admin_subadmins')
+
+
+# ════════════════════════════════════════════════
+#  SUB-ADMIN API ENDPOINTS
+# ════════════════════════════════════════════════
+
+class SubAdminOTPAPI(View):
+    """API for sub-admin forgot password OTP."""
+    def post(self, request):
+        email = request.POST.get('email')
+        user = CustomUser.objects.filter(email=email, role=CustomUser.Role.SUB_ADMIN).first()
+        
+        if not user:
+            return JsonResponse({'status': 'error', 'message': 'Sub-Admin not found.'}, status=404)
+
+        import random
+        otp_code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+        
+        SubAdminOTP.objects.filter(user=user).delete()
+        SubAdminOTP.objects.create(
+            user=user, 
+            otp=otp_code,
+            expires_at=timezone.now() + timezone.timedelta(minutes=5)
+        )
+        
+        subject = "Sub-Admin Password Reset OTP"
+        message = f"OTP for {user.username}: {otp_code}"
+        
+        try:
+            send_mail(
+                subject, message, settings.DEFAULT_FROM_EMAIL, [settings.ADMIN_EMAIL]
+            )
+            return JsonResponse({'status': 'success', 'message': 'OTP sent to Admin.'})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+# ════════════════════════════════════════════════
 #  ADMIN DASHBOARD VIEWS (SUPERUSER ONLY)
 # ════════════════════════════════════════════════
 
-class AdminDashboardView(SuperuserRequiredMixin, TemplateView):
+class AdminDashboardView(BaseAdminRequiredMixin, TemplateView):
     """Admin dashboard home — overview analytics."""
     template_name = 'exams/admin/dashboard.html'
 
@@ -646,7 +1039,7 @@ class AdminDashboardView(SuperuserRequiredMixin, TemplateView):
         return ctx
 
 
-class AdminStudentsView(SuperuserRequiredMixin, ListView):
+class AdminStudentsView(BaseAdminRequiredMixin, ListView):
     """View all students with full profile details."""
     template_name = 'exams/admin/students.html'
     context_object_name = 'students'
@@ -690,7 +1083,7 @@ class AdminStudentsView(SuperuserRequiredMixin, ListView):
         return ctx
 
 
-class AdminStudentDetailView(SuperuserRequiredMixin, DetailView):
+class AdminStudentDetailView(BaseAdminRequiredMixin, DetailView):
     """Full student profile visible to admin."""
     template_name = 'exams/admin/student_detail.html'
     context_object_name = 'student'
@@ -725,7 +1118,7 @@ class AdminDeleteStudentView(SuperuserRequiredMixin, View):
         return redirect('admin_students')
 
 
-class AdminQuestionsView(SuperuserRequiredMixin, ListView):
+class AdminQuestionsView(BaseAdminRequiredMixin, ListView):
     """Question bank management."""
     template_name = 'exams/admin/questions.html'
     context_object_name = 'questions'
@@ -762,7 +1155,7 @@ class AdminQuestionsView(SuperuserRequiredMixin, ListView):
         return ctx
 
 
-class AdminCategoryDetailView(SuperuserRequiredMixin, ListView):
+class AdminCategoryDetailView(BaseAdminRequiredMixin, ListView):
     """View all questions within a specific category."""
     template_name = 'exams/admin/category_detail.html'
     context_object_name = 'questions'
@@ -786,7 +1179,7 @@ class AdminCategoryDetailView(SuperuserRequiredMixin, ListView):
         return ctx
 
 
-class AdminAddQuestionView(SuperuserRequiredMixin, View):
+class AdminAddQuestionView(BaseAdminRequiredMixin, View):
     """Add individual question, optionally pre-selecting a category."""
 
     def get(self, request, category_id=None):
@@ -820,7 +1213,7 @@ class AdminAddQuestionView(SuperuserRequiredMixin, View):
         })
 
 
-class AdminImportQuestionsView(SuperuserRequiredMixin, View):
+class AdminImportQuestionsView(BaseAdminRequiredMixin, View):
     """Bulk import questions, optionally forcing a specific category."""
 
     def get(self, request, category_id=None):
@@ -869,14 +1262,14 @@ class AdminImportQuestionsView(SuperuserRequiredMixin, View):
         })
 
 
-class AdminQuestionDetailView(SuperuserRequiredMixin, DetailView):
+class AdminQuestionDetailView(BaseAdminRequiredMixin, DetailView):
     """View a single question detail."""
     model = Question
     template_name = 'exams/admin/question_detail.html'
     context_object_name = 'question'
 
 
-class AdminEditQuestionView(SuperuserRequiredMixin, View):
+class AdminEditQuestionView(BaseAdminRequiredMixin, View):
     """Update an existing question."""
 
     def get(self, request, pk):
@@ -914,7 +1307,7 @@ class AdminDeleteQuestionView(SuperuserRequiredMixin, View):
         return redirect('admin_category_detail', pk=category_id)
 
 
-class AdminExamRequestsView(SuperuserRequiredMixin, ListView):
+class AdminExamRequestsView(BaseAdminRequiredMixin, ListView):
     """Manage exam access requests — filter, approve, reject."""
     template_name = 'exams/admin/exam_requests.html'
     context_object_name = 'requests'
@@ -935,7 +1328,7 @@ class AdminExamRequestsView(SuperuserRequiredMixin, ListView):
         return ctx
 
 
-class AdminApproveRequestView(SuperuserRequiredMixin, View):
+class AdminApproveRequestView(BaseAdminRequiredMixin, View):
     """Approve a single exam request and generate paper."""
 
     def post(self, request, request_id):
@@ -962,7 +1355,7 @@ class AdminApproveRequestView(SuperuserRequiredMixin, View):
         return redirect('admin_exam_requests')
 
 
-class AdminRejectRequestView(SuperuserRequiredMixin, View):
+class AdminRejectRequestView(BaseAdminRequiredMixin, View):
     """Reject a single exam request with reason."""
 
     def post(self, request, request_id):
@@ -973,7 +1366,7 @@ class AdminRejectRequestView(SuperuserRequiredMixin, View):
         return redirect('admin_exam_requests')
 
 
-class AdminBulkRequestActionView(SuperuserRequiredMixin, View):
+class AdminBulkRequestActionView(BaseAdminRequiredMixin, View):
     """Bulk approve or reject multiple requests."""
 
     def post(self, request):
@@ -1002,7 +1395,7 @@ class AdminBulkRequestActionView(SuperuserRequiredMixin, View):
         return redirect('admin_exam_requests')
 
 
-class AdminResultsView(SuperuserRequiredMixin, ListView):
+class AdminResultsView(BaseAdminRequiredMixin, ListView):
     """View all exam results with analytics."""
     template_name = 'exams/admin/results.html'
     context_object_name = 'results'
@@ -1175,7 +1568,7 @@ class AdminBulkDeleteStudentsView(SuperuserRequiredMixin, View):
         return redirect('admin_students')
 
 
-class AdminResultDetailView(SuperuserRequiredMixin, DetailView):
+class AdminResultDetailView(BaseAdminRequiredMixin, DetailView):
     """Detailed result view — question-wise breakdown (admin only)."""
     template_name = 'exams/admin/result_detail.html'
     context_object_name = 'result'
@@ -1192,7 +1585,7 @@ class AdminResultDetailView(SuperuserRequiredMixin, DetailView):
         return ctx
 
 
-class AdminNotificationsView(SuperuserRequiredMixin, ListView):
+class AdminNotificationsView(BaseAdminRequiredMixin, ListView):
     """Admin notification management."""
     template_name = 'exams/admin/notifications.html'
     context_object_name = 'notifications'
@@ -1213,7 +1606,7 @@ class AdminNotificationsView(SuperuserRequiredMixin, ListView):
 #  ADMIN CATEGORY VIEWS
 # ════════════════════════════════════════════════
 
-class AdminCategoriesView(SuperuserRequiredMixin, ListView):
+class AdminCategoriesView(BaseAdminRequiredMixin, ListView):
     """List all exam categories."""
     template_name = 'exams/admin/categories.html'
     context_object_name = 'categories'
@@ -1224,7 +1617,7 @@ class AdminCategoriesView(SuperuserRequiredMixin, ListView):
         ).order_by('name')
 
 
-class AdminAddCategoryView(SuperuserRequiredMixin, View):
+class AdminAddCategoryView(BaseAdminRequiredMixin, View):
     """Create a new exam category."""
     
     def get(self, request):
@@ -1240,7 +1633,7 @@ class AdminAddCategoryView(SuperuserRequiredMixin, View):
         return render(request, 'exams/admin/add_category.html', {'form': form})
 
 
-class AdminEditCategoryView(SuperuserRequiredMixin, View):
+class AdminEditCategoryView(BaseAdminRequiredMixin, View):
     """Update an existing category."""
     
     def get(self, request, pk):
@@ -1263,8 +1656,24 @@ class AdminDeleteCategoryView(SuperuserRequiredMixin, View):
     
     def post(self, request, pk):
         cat = get_object_or_404(Category, pk=pk)
+        
+        # Manually cascade to bypass PROTECT constraints
+        # 1. Delete student answers for all questions in this category
+        StudentAnswer.objects.filter(question__category=cat).delete()
+        
+        # 2. Delete student exam results for all papers in this category
+        StudentExamResult.objects.filter(exam_paper__category=cat).delete()
+        
+        # 3. Delete exam papers in this category (cascades to ExamPaperQuestion)
+        ExamPaper.objects.filter(category=cat).delete()
+        
+        # 4. Delete questions in this category
+        Question.objects.filter(category=cat).delete()
+        
+        # 5. Delete category itself
         cat.delete()
-        messages.success(request, 'Category and all related data deleted successfully.')
+        
+        messages.success(request, 'Category and all related records deleted successfully.')
         return redirect('admin_categories')
 
 
@@ -1277,12 +1686,22 @@ class AdminBulkDeleteCategoriesView(SuperuserRequiredMixin, View):
             messages.warning(request, "No categories selected for deletion.")
             return redirect('admin_categories')
             
-        count = Category.objects.filter(id__in=selected_ids).delete()[0]
-        messages.success(request, f"Successfully deleted {count} categories and their related questions.")
+        categories = Category.objects.filter(id__in=selected_ids)
+        
+        # Manually cascade for bulk delete
+        StudentAnswer.objects.filter(question__category__in=categories).delete()
+        StudentExamResult.objects.filter(exam_paper__category__in=categories).delete()
+        ExamPaper.objects.filter(category__in=categories).delete()
+        Question.objects.filter(category__in=categories).delete()
+        
+        count = categories.count()
+        categories.delete()
+        
+        messages.success(request, f"Successfully deleted {count} categories and all related records.")
         return redirect('admin_categories')
 
 
-class AdminToggleCategoryStatusView(SuperuserRequiredMixin, View):
+class AdminToggleCategoryStatusView(BaseAdminRequiredMixin, View):
     """Toggle is_active status of a category."""
     
     def post(self, request, pk):
@@ -1650,4 +2069,33 @@ class PreviewCertificateView(View):
         response = HttpResponse(content_type="image/png")
         img.save(response, "PNG")
         return response
+
+
+# ════════════════════════════════════════════════
+#  CUSTOM ERROR HANDLERS
+# ════════════════════════════════════════════════
+
+def error_404(request, exception):
+    """Page Not Found"""
+    return render(request, 'errors/404.html', status=404)
+
+def error_500(request):
+    """Internal Server Error"""
+    return render(request, 'errors/500.html', status=500)
+
+def error_403(request, exception=None):
+    """Permission Denied"""
+    return render(request, 'errors/403.html', status=403)
+
+def error_400(request, exception=None):
+    """Bad Request"""
+    return render(request, 'errors/400.html', status=400)
+
+def error_502(request):
+    """Bad Gateway"""
+    return render(request, 'errors/502.html', status=502)
+
+def error_503(request):
+    """Service Unavailable"""
+    return render(request, 'errors/503.html', status=503)
 

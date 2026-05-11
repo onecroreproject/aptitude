@@ -18,9 +18,11 @@
     <form id="bulk-delete-form" action="{% url 'admin_bulk_delete_students' %}" method="POST" 
           onsubmit="confirmAction({event: event, title: 'Remove Selected Students?', text: 'All history for these students will be permanently deleted.', confirmButtonText: 'Yes, Remove All', callback: () => this.submit()});">
         {% csrf_token %}
+        {% if user.is_superuser %}
         <div style="margin-bottom: 12px; display: none;" id="bulk-actions-bar">
             <button type="submit" class="btn btn-rejected btn-sm">🗑️ Delete Selected Students</button>
         </div>
+        {% endif %}
 
         <div class="table-container">
             <table class="data-table">
@@ -72,7 +74,9 @@
                         <td>
                             <div style="display: flex; gap: 8px;">
                                 <a href="{% url 'admin_student_detail' s.id %}" class="btn-action btn-view" title="View Profile">👁️</a>
+                                {% if user.is_superuser %}
                                 <button type="button" onclick="confirmSingleDelete('{{ s.id }}', '{{ s.name|default:s.username }}')" class="btn-action btn-delete" title="Delete Student">🗑️</button>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>

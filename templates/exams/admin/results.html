@@ -44,9 +44,11 @@
     <form id="bulk-delete-form" action="{% url 'admin_bulk_delete_results' %}" method="POST" 
           onsubmit="confirmAction({event: event, title: 'Delete Selected Results?', text: 'These results will be permanently removed from the database.', confirmButtonText: 'Yes, Delete All', callback: () => this.submit()});">
         {% csrf_token %}
+        {% if user.is_superuser %}
         <div style="margin-bottom: 12px; display: none;" id="bulk-actions-bar">
             <button type="submit" class="btn btn-rejected btn-sm">🗑️ Delete Selected</button>
         </div>
+        {% endif %}
 
         <div class="table-container">
             <table class="data-table">
@@ -79,7 +81,9 @@
                         <td>
                             <div style="display: flex; gap: 8px;">
                                 <a href="{% url 'admin_result_detail' r.id %}" class="btn btn-outline btn-sm" title="View Report">Report</a>
+                                {% if user.is_superuser %}
                                 <button type="button" onclick="confirmDelete('{{ r.id }}', '{{ r.student.username }}')" class="btn btn-outline btn-sm" style="color: var(--accent-rejected); border-color: var(--accent-rejected);">🗑️</button>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>

@@ -1,0 +1,9 @@
+{% extends 'errors/base.html' %}
+
+{% block error_code %}503{% endblock %}
+{% block error_code_display %}503{% endblock %}
+{% block illustration %}🛠️{% endblock %}
+{% block error_title_display %}Service Unavailable{% endblock %}
+{% block error_message_display %}
+    We're currently performing maintenance or the server is overloaded. Please check back in a few minutes. We apologize for the inconvenience.
+{% endblock %}

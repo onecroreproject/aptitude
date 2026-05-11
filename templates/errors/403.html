@@ -1,0 +1,9 @@
+{% extends 'errors/base.html' %}
+
+{% block error_code %}403{% endblock %}
+{% block error_code_display %}403{% endblock %}
+{% block illustration %}🚫{% endblock %}
+{% block error_title_display %}Permission Denied{% endblock %}
+{% block error_message_display %}
+    You don't have permission to access this page. This action may be restricted to certain roles or require specific privileges.
+{% endblock %}

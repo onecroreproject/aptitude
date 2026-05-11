@@ -1,0 +1,9 @@
+{% extends 'errors/base.html' %}
+
+{% block error_code %}502{% endblock %}
+{% block error_code_display %}502{% endblock %}
+{% block illustration %}🌐{% endblock %}
+{% block error_title_display %}Bad Gateway{% endblock %}
+{% block error_message_display %}
+    The server received an invalid response from an upstream server. This is often temporary—please try refreshing the page in a moment.
+{% endblock %}

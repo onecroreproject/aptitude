@@ -14,9 +14,11 @@
   <form id="bulk-delete-form" action="{% url 'admin_bulk_delete_categories' %}" method="POST" 
         onsubmit="confirmAction({event: event, title: 'Delete Selected Categories?', text: 'All questions inside these categories will also be permanently deleted.', confirmButtonText: 'Yes, Delete All', callback: () => this.submit()});">
     {% csrf_token %}
+    {% if user.is_superuser %}
     <div style="margin-bottom: 12px; display: none;" id="bulk-actions-bar">
       <button type="submit" class="btn btn-rejected btn-sm">🗑️ Delete Selected Categories</button>
     </div>
+    {% endif %}
 
     <div class="table-container">
       <table class="data-table">
@@ -55,11 +57,13 @@
                 <div style="display: flex; gap: 12px; align-items: center; justify-content: flex-start;">
                   <a href="{% url 'admin_category_detail' category.pk %}" class="btn-action btn-view" title="View Category Details">👁️</a>
                   <a href="{% url 'admin_edit_category' category.pk %}" class="btn-action btn-edit" title="Edit Category">✏️</a>
+                  {% if user.is_superuser %}
                   <form action="{% url 'admin_delete_category' category.pk %}" method="POST" 
                         onsubmit="confirmAction({event: event, title: 'Delete Category?', text: 'All questions inside this category will be permanently deleted.', confirmButtonText: 'Yes, Delete It', callback: () => this.submit()});" style="display: inline;">
                     {% csrf_token %}
                     <button type="submit" class="btn-action btn-delete" title="Delete Category">🗑️</button>
                   </form>
+                  {% endif %}
                 </div>
               </td>
             </tr>

@@ -19,11 +19,13 @@
         </div>
         <div style="display: flex; gap: 12px;">
             <a href="{% url 'admin_edit_question' question.pk %}" class="btn btn-outline">✏️ Edit Question</a>
+            {% if user.is_superuser %}
             <form action="{% url 'admin_delete_question' question.pk %}" method="POST" 
                   onsubmit="confirmAction({event: event, title: 'Delete Question?', text: 'Are you sure you want to remove this question from the database?', confirmButtonText: 'Yes, Delete', callback: () => this.submit()});">
                 {% csrf_token %}
                 <button type="submit" class="btn btn-outline" style="color: var(--accent-danger); border-color: var(--accent-danger);">🗑️ Delete</button>
             </form>
+            {% endif %}
         </div>
     </div>
 

@@ -9,6 +9,9 @@ urlpatterns = [
     # ── Authentication ───────────────────────────
     path('', views.LoginView.as_view(), name='home'),
     path('register/', views.RegisterView.as_view(), name='register'),
+    path('verify-registration-otp/', views.VerifyRegistrationOTPView.as_view(), name='verify_registration_otp'),
+    path('api/otp/send/', views.SendRegistrationOTPAPI.as_view(), name='api_send_otp'),
+    path('api/otp/verify/', views.VerifyRegistrationOTPAPI.as_view(), name='api_verify_otp'),
     path('login/', views.LoginView.as_view(), name='login'),
     path('logout/', views.LogoutView.as_view(), name='logout'),
     path('forgot-password/', views.ForgotPasswordView.as_view(), name='forgot_password'),
@@ -65,4 +68,16 @@ urlpatterns = [
     path('admin-panel/students/bulk-delete/', views.AdminBulkDeleteStudentsView.as_view(), name='admin_bulk_delete_students'),
     path('admin-panel/notifications/', views.AdminNotificationsView.as_view(), name='admin_notifications'),
     path('preview-certificate/', views.PreviewCertificateView.as_view(), name='preview_certificate'),
+
+    # ── Sub-Admin Management (Superuser Only) ──
+    path('admin-panel/subadmins/', views.AdminSubAdminsView.as_view(), name='admin_subadmins'),
+    path('admin-panel/subadmins/add/', views.AdminAddSubAdminView.as_view(), name='admin_add_subadmin'),
+    path('admin-panel/subadmins/<int:pk>/edit/', views.AdminEditSubAdminView.as_view(), name='admin_edit_subadmin'),
+    path('admin-panel/subadmins/<int:pk>/delete/', views.AdminDeleteSubAdminView.as_view(), name='admin_delete_subadmin'),
+
+    # ── Sub-Admin Auth (Forgot Password) ───────
+    path('subadmin/forgot-password/', views.SubAdminForgotPasswordView.as_view(), name='subadmin_forgot_password'),
+    path('subadmin/verify-otp/', views.SubAdminVerifyOTPView.as_view(), name='subadmin_verify_otp'),
+    path('subadmin/reset-password/', views.SubAdminResetPasswordView.as_view(), name='subadmin_reset_password'),
+    path('api/subadmin/otp/send/', views.SubAdminOTPAPI.as_view(), name='api_subadmin_otp_send'),
 ]

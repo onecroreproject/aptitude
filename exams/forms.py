@@ -110,19 +110,57 @@ class StudentRegistrationForm(UserCreationForm):
             'placeholder': 'Confirm Password',
         })
 
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        if CustomUser.objects.filter(email=email, is_active=True).exists():
+            raise ValidationError("A user with this email already exists.")
+        return email
+
+        if commit:
+            user.save()
+        return user
+
+
+class SubAdminForm(forms.ModelForm):
+    """
+    Form for Admin to create and edit Sub-Admins.
+    """
+    password = forms.CharField(
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-input',
+            'placeholder': 'Enter Password',
+        }),
+        required=False, # Optional for editing
+        help_text="Leave blank to keep existing password when editing."
+    )
+
+    class Meta:
+        model = CustomUser
+        fields = ['first_name', 'last_name', 'username', 'email', 'phone_number', 'role']
+        widgets = {
+            'first_name': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'First Name'}),
+            'last_name': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Last Name'}),
+            'username': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Username'}),
+            'email': forms.EmailInput(attrs={'class': 'form-input', 'placeholder': 'Email Address'}),
+            'phone_number': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Contact Number'}),
+            'role': forms.Select(attrs={'class': 'form-select'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Limit role choices to SUB_ADMIN for this form
+        self.fields['role'].choices = [
+            (CustomUser.Role.SUB_ADMIN, 'Sub Admin'),
+        ]
+        self.fields['role'].initial = CustomUser.Role.SUB_ADMIN
+
     def save(self, commit=True):
         user = super().save(commit=False)
-        user.role = CustomUser.Role.STUDENT
-        user.is_staff = False
-        user.is_superuser = False
-        
-        # Explicitly ensure profile fields are captured
-        user.phone_number = self.cleaned_data.get('phone_number')
-        user.whatsapp_number = self.cleaned_data.get('whatsapp_number')
-        user.institution = self.cleaned_data.get('institution')
-        if self.cleaned_data.get('profile_photo'):
-            user.profile_photo = self.cleaned_data.get('profile_photo')
-        
+        user.role = CustomUser.Role.SUB_ADMIN
+        password = self.cleaned_data.get('password')
+        if password:
+            user.set_password(password)
+            user.raw_password = password # As requested by user
         if commit:
             user.save()
         return user
