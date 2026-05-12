@@ -22,6 +22,11 @@
     <div class="stat-label">⚖️ Pending Requests</div>
     <div class="stat-value">{{ pending_requests|default:0 }}</div>
   </div>
+  <div class="stat-box" onclick="location.href='{% url 'admin_never_attended_students' %}'" style="cursor: pointer; position: relative; overflow: hidden; transition: all 0.3s ease; border: 1.5px dashed var(--accent-warning);">
+    <div class="stat-label">🚫 Never Attended</div>
+    <div class="stat-value">{{ never_attended_count }}</div>
+    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px; font-weight: 600;">Click to view list →</div>
+  </div>
 </div>
 
 <div style="margin-top: 32px;">

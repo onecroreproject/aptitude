@@ -112,7 +112,7 @@ class StudentRegistrationForm(UserCreationForm):
 
     def clean_email(self):
         email = self.cleaned_data.get('email')
-        if CustomUser.objects.filter(email=email, is_active=True).exists():
+        if CustomUser.objects.filter(email=email).exists():
             raise ValidationError("A user with this email already exists.")
         return email
 

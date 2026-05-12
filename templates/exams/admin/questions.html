@@ -31,7 +31,7 @@
           {% endfor %}
         </select>
       </div>
-
+ 
       <div style="min-width: 120px;">
         <label class="label">Difficulty</label>
         <select name="difficulty" class="input">
@@ -41,56 +41,104 @@
           {% endfor %}
         </select>
       </div>
-
+ 
       <button type="submit" class="btn btn-primary">Filter</button>
       <a href="{% url 'admin_questions' %}" class="btn btn-outline">Clear</a>
     </form>
   </div>
-
-  <div class="table-container">
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Question</th>
-          <th>Category</th>
-          <th>Difficulty</th>
-          <th>Marks</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for q in questions %}
+ 
+  <form id="bulk-delete-form" action="{% url 'admin_bulk_delete_questions' %}" method="POST" 
+        onsubmit="confirmAction({event: event, title: 'Delete Selected Questions?', text: 'Are you sure you want to remove these questions from the question bank?', confirmButtonText: 'Yes, Remove All', callback: () => this.submit()});">
+    {% csrf_token %}
+ 
+    {% if user.is_superuser or user.role == 'Sub Admin' %}
+    <div style="margin-bottom: 16px; display: none; animation: fadeIn 0.3s ease;" id="bulk-actions-bar">
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px 20px; background: #fff5f5; border: 1px solid #feb2b2; border-radius: 12px;">
+        <span style="font-size: 14px; font-weight: 600; color: #c53030;" id="selected-count">0 questions selected</span>
+        <button type="submit" class="btn btn-danger btn-sm" style="background: #e53e3e; color: #fff;">🗑️ Delete Selected</button>
+      </div>
+    </div>
+    {% endif %}
+ 
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
           <tr>
-            <td style="max-width: 400px; font-weight: 500;">
-              <div style="color: var(--text-primary);">{{ q.question_text|truncatewords:20 }}</div>
-              <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">{{ q.get_question_type_display }}</div>
-            </td>
-            <td><span class="badge badge-approved" style="background: var(--accent-primary-light); color: var(--accent-primary);">{{ q.category.name }}</span></td>
-            <td><span class="badge badge-approved" style="background: #f1f5f9; color: var(--text-secondary);">{{ q.difficulty }}</span></td>
-            <td style="font-weight: 700;">{{ q.marks }}</td>
-            <td>
-              <div style="display: flex; gap: 8px;">
-                <a href="{% url 'admin_view_question' q.pk %}" class="btn-action btn-view" title="View Details">👁️</a>
-                <a href="{% url 'admin_edit_question' q.pk %}" class="btn-action btn-edit" title="Edit Question">✏️</a>
-                {% if user.is_superuser %}
-                <form action="{% url 'admin_delete_question' q.pk %}" method="POST" 
-                      onsubmit="confirmAction({event: event, title: 'Delete Question?', text: 'This question will be permanently removed from the bank.', confirmButtonText: 'Yes, Delete', callback: () => this.submit()});" style="display: inline;">
-                  {% csrf_token %}
-                  <button type="submit" class="btn-action btn-delete" title="Delete Question">🗑️</button>
-                </form>
-                {% endif %}
-              </div>
-            </td>
+            <th style="width: 40px;"><input type="checkbox" id="select-all"></th>
+            <th>Question</th>
+            <th>Category</th>
+            <th>Difficulty</th>
+            <th>Marks</th>
+            <th>Actions</th>
           </tr>
-        {% empty %}
-          <tr>
-            <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 48px;">
-              No questions matching your criteria.
-            </td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+        </thead>
+        <tbody>
+          {% for q in questions %}
+            <tr>
+              <td><input type="checkbox" name="selected_ids" value="{{ q.id }}" class="record-checkbox"></td>
+              <td style="max-width: 400px; font-weight: 500;">
+                <div style="color: var(--text-primary);">{{ q.question_text|truncatewords:20 }}</div>
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">{{ q.get_question_type_display }}</div>
+              </td>
+              <td><span class="badge badge-approved" style="background: var(--accent-primary-light); color: var(--accent-primary);">{{ q.category.name }}</span></td>
+              <td><span class="badge badge-approved" style="background: #f1f5f9; color: var(--text-secondary);">{{ q.difficulty }}</span></td>
+              <td style="font-weight: 700;">{{ q.marks }}</td>
+              <td>
+                <div style="display: flex; gap: 8px;">
+                  <a href="{% url 'admin_view_question' q.pk %}" class="btn-action btn-view" title="View Details">👁️</a>
+                  <a href="{% url 'admin_edit_question' q.pk %}" class="btn-action btn-edit" title="Edit Question">✏️</a>
+                  {% if user.is_superuser or user.role == 'Sub Admin' %}
+                  <form action="{% url 'admin_delete_question' q.pk %}" method="POST" 
+                        onsubmit="confirmAction({event: event, title: 'Delete Question?', text: 'This question will be removed from the bank.', confirmButtonText: 'Yes, Delete', callback: () => this.submit()});" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-action btn-delete" title="Delete Question">🗑️</button>
+                  </form>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 48px;">
+                No questions matching your criteria.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </form>
 </div>
+ 
+<script>
+  const selectAll = document.getElementById('select-all');
+  const checkboxes = document.querySelectorAll('.record-checkbox');
+  const bulkBar = document.getElementById('bulk-actions-bar');
+  const countSpan = document.getElementById('selected-count');
+ 
+  function updateBulkBar() {
+      const checkedCount = document.querySelectorAll('.record-checkbox:checked').length;
+      if (bulkBar) {
+          bulkBar.style.display = checkedCount > 0 ? 'block' : 'none';
+          countSpan.textContent = `${checkedCount} question${checkedCount > 1 ? 's' : ''} selected`;
+      }
+  }
+ 
+  if (selectAll) {
+      selectAll.addEventListener('change', () => {
+          checkboxes.forEach(cb => {
+              cb.checked = selectAll.checked;
+          });
+          updateBulkBar();
+      });
+  }
+ 
+  checkboxes.forEach(cb => {
+      cb.addEventListener('change', () => {
+          updateBulkBar();
+          if (!cb.checked) selectAll.checked = false;
+          if (document.querySelectorAll('.record-checkbox:checked').length === checkboxes.length) selectAll.checked = true;
+      });
+  });
+</script>
 {% endblock %}

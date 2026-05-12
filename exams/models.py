@@ -175,19 +175,6 @@ class OTP(models.Model):
         return f"OTP for {self.user.username} - {self.code}"
 
 
-class RegistrationOTP(models.Model):
-    """
-    Temporary one-time password for student registration workflow.
-    Sent only to admin email.
-    """
-    email = models.EmailField(unique=True)
-    otp = models.CharField(max_length=6)
-    created_at = models.DateTimeField(auto_now_add=True)
-    expires_at = models.DateTimeField()
-    is_verified = models.BooleanField(default=False)
-
-    def is_expired(self):
-        return timezone.now() > self.expires_at
 
 class SubAdminOTP(models.Model):
     """
@@ -1070,3 +1057,33 @@ class Notification(models.Model):
         return cls.objects.filter(
             recipient=user, is_read=False
         ).update(is_read=True)
+
+
+class Certificate(models.Model):
+    """
+    Issued when a student scores >= 85% on an exam.
+    Only one certificate per student per category.
+    Updates on subsequent attempts if score qualifies.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='certificates')
+    category = models.ForeignKey('Category', on_delete=models.CASCADE, related_name='certificates')
+    
+    # Latest performance details
+    marks = models.DecimalField(max_digits=7, decimal_places=2)
+    percentage = models.DecimalField(max_digits=5, decimal_places=2)
+    total_marks = models.PositiveIntegerField()
+    exam_date = models.DateTimeField(default=timezone.now)
+    
+    # Metadata
+    issued_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('student', 'category')
+        verbose_name = 'Certificate'
+        verbose_name_plural = 'Certificates'
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f"Certificate: {self.student.username} - {self.category.name}"

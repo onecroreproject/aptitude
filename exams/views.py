@@ -46,8 +46,8 @@ from .models import (
     ExamRequest,
     Notification,
     OTP,
-    RegistrationOTP,
     SubAdminOTP,
+    Certificate,
 )
 from .utils import import_questions_from_excel, generate_exam_paper, submit_and_evaluate
 
@@ -81,175 +81,17 @@ class RegisterView(View):
             email = form.cleaned_data.get('email')
             CustomUser.objects.filter(email=email, is_active=False).delete()
             
-            # Save user but keep them inactive until OTP verification
-            user = form.save(commit=False)
-            user.is_active = False
-            user.save()
+            # Save user and activate immediately
+            user = form.save()
             
-            # Generate 6-digit random OTP
-            import random
-            otp_code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
-            
-            # Save Registration OTP to DB
-            from django.utils import timezone
-            RegistrationOTP.objects.filter(email=user.email).delete() # Remove any previous OTPs for this email
-            RegistrationOTP.objects.create(
-                email=user.email, 
-                otp=otp_code,
-                expires_at=timezone.now() + timezone.timedelta(minutes=5)
-            )
-            
-            # Send Email ONLY to Admin
-            subject = "New Student Registration - OTP Verification"
-            message = f"Hello Admin,\n\nA new student has registered:\nUsername: {user.username}\nEmail: {user.email}\n\nPlease share this OTP with the student manually: {otp_code}\n\nThis OTP is valid for 5 minutes.\n\nRegards,\nAptipro System"
-            
-            try:
-                send_mail(
-                    subject,
-                    message,
-                    settings.DEFAULT_FROM_EMAIL,
-                    [settings.ADMIN_EMAIL],
-                    fail_silently=False,
-                )
-                request.session['reg_email'] = user.email
-                messages.success(request, 'Registration initiated! Please enter the OTP shared by the administrator to complete your registration.')
-                return redirect('verify_registration_otp')
-            except Exception as e:
-                messages.error(request, f"Failed to notify admin. Error: {str(e)}")
-                # Even if mail fails, we still need verification, but it's a problem if admin doesn't get it.
-                return redirect('verify_registration_otp')
+            # Log them in
+            login(request, user)
+            messages.success(request, 'Registration complete! Welcome to Aptipro.')
+            return redirect('student_dashboard')
         return render(request, 'exams/register.html', {'form': form})
 
 
-class VerifyRegistrationOTPView(View):
-    """View for students to enter the registration OTP shared by the admin."""
-    def get(self, request):
-        if 'reg_email' not in request.session:
-            return redirect('register')
-        form = OTPVerificationForm()
-        return render(request, 'exams/verify_registration_otp.html', {'form': form})
 
-    def post(self, request):
-        if 'reg_email' not in request.session:
-            return redirect('register')
-        
-        email = request.session['reg_email']
-        form = OTPVerificationForm(request.POST)
-        
-        if form.is_valid():
-            code = form.cleaned_data['code']
-            otp_obj = RegistrationOTP.objects.filter(email=email, otp=code, is_verified=False).last()
-            
-            if not otp_obj:
-                messages.error(request, "Invalid OTP.")
-            elif otp_obj.is_expired():
-                messages.error(request, "OTP expired.")
-            else:
-                # Success
-                otp_obj.is_verified = True
-                otp_obj.save()
-                
-                # Activate user
-                user = get_object_or_404(CustomUser, email=email)
-                user.is_active = True
-                user.save()
-                
-                # Log them in
-                login(request, user)
-                
-                # Delete OTP as it's single use
-                otp_obj.delete()
-                
-                # Clean up session
-                del request.session['reg_email']
-                
-                messages.success(request, 'Registration complete! Welcome to Aptipro.')
-                return redirect('student_dashboard')
-                
-        return render(request, 'exams/verify_registration_otp.html', {'form': form})
-
-
-# ════════════════════════════════════════════════
-#  OTP API ENDPOINTS (FOR FETCH API)
-# ════════════════════════════════════════════════
-
-class SendRegistrationOTPAPI(View):
-    """API endpoint to resend registration OTP to admin."""
-    def post(self, request):
-        email = request.POST.get('email') or request.session.get('reg_email')
-        if not email:
-            return JsonResponse({'status': 'error', 'message': 'Email required.'}, status=400)
-            
-        user = CustomUser.objects.filter(email=email, is_active=False).first()
-        if not user:
-            return JsonResponse({'status': 'error', 'message': 'User not found or already active.'}, status=404)
-
-        # Generate new OTP
-        import random
-        otp_code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
-        
-        from django.utils import timezone
-        RegistrationOTP.objects.filter(email=email).delete()
-        RegistrationOTP.objects.create(
-            email=email, 
-            otp=otp_code,
-            expires_at=timezone.now() + timezone.timedelta(minutes=5)
-        )
-        
-        # Send Email to Admin
-        subject = "Resent Registration OTP"
-        message = f"Hello Admin,\n\nA new student registration OTP has been requested:\nUsername: {user.username}\nEmail: {user.email}\n\nOTP: {otp_code}\n\nRegards,\nAptipro System"
-        
-        try:
-            send_mail(
-                subject,
-                message,
-                settings.DEFAULT_FROM_EMAIL,
-                [settings.ADMIN_EMAIL],
-                fail_silently=False,
-            )
-            return JsonResponse({'status': 'success', 'message': 'OTP sent to administrator.'})
-        except Exception as e:
-            return JsonResponse({'status': 'error', 'message': f'Failed to send email: {str(e)}'}, status=500)
-
-
-class VerifyRegistrationOTPAPI(View):
-    """API endpoint to verify registration OTP."""
-    def post(self, request):
-        try:
-            data = json.loads(request.body)
-            email = data.get('email') or request.session.get('reg_email')
-            code = data.get('code')
-        except:
-            email = request.POST.get('email') or request.session.get('reg_email')
-            code = request.POST.get('code')
-
-        if not email or not code:
-            return JsonResponse({'status': 'error', 'message': 'Email and code are required.'}, status=400)
-
-        otp_obj = RegistrationOTP.objects.filter(email=email, otp=code, is_verified=False).last()
-        
-        if not otp_obj:
-            return JsonResponse({'status': 'error', 'message': 'Invalid OTP.'}, status=400)
-        
-        if otp_obj.is_expired():
-            return JsonResponse({'status': 'error', 'message': 'OTP expired.'}, status=400)
-
-        # Success
-        user = CustomUser.objects.filter(email=email, is_active=False).first()
-        if not user:
-            return JsonResponse({'status': 'error', 'message': 'User not found or already active.'}, status=404)
-
-        user.is_active = True
-        user.save()
-        
-        login(request, user)
-        otp_obj.delete()
-        
-        if 'reg_email' in request.session:
-            del request.session['reg_email']
-            
-        return JsonResponse({'status': 'success', 'message': 'Verification successful!'})
 
 
 class LoginView(View):
@@ -777,8 +619,32 @@ class TakeExamView(StudentRequiredMixin, View):
 
 
 class ExamCompleteView(StudentRequiredMixin, TemplateView):
-    """Shows "Test Completed" message — no scores visible to students."""
+    """Shows "Test Completed" message with optional congratulations popup."""
     template_name = 'exams/student/exam_complete.html'
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        user = self.request.user
+        
+        # Get the latest result for this student
+        latest_result = StudentExamResult.objects.filter(
+            student=user
+        ).select_related('exam_paper', 'exam_paper__category').order_by('-submitted_at').first()
+        
+        if latest_result and latest_result.status == 'Evaluated':
+            percentage = latest_result.percentage()
+            if percentage >= 85:
+                ctx['show_congratulations'] = True
+                ctx['result'] = latest_result
+                ctx['percentage'] = percentage
+                ctx['marks'] = latest_result.total_marks_obtained
+                ctx['total'] = latest_result.total_marks_possible
+                ctx['exam_name'] = latest_result.exam_paper.category.name
+                ctx['category_name'] = latest_result.exam_paper.category.name
+                # Domain is typically a field in Category, if not we use Category name
+                ctx['domain_name'] = getattr(latest_result.exam_paper.category, 'domain', 'Aptitude')
+        
+        return ctx
 
     def dispatch(self, request, *args, **kwargs):
         response = super().dispatch(request, *args, **kwargs)
@@ -988,6 +854,11 @@ class AdminDashboardView(BaseAdminRequiredMixin, TemplateView):
         ctx['total_exams'] = StudentExamResult.objects.count()
         ctx['pending_requests'] = ExamRequest.objects.filter(status='Pending').count()
 
+        # Students who registered but never attended exam
+        attended_student_ids = StudentExamResult.objects.values_list('student_id', flat=True).distinct()
+        ctx['never_attended_count'] = CustomUser.objects.filter(role='Student').exclude(id__in=attended_student_ids).count()
+        ctx['attended_count'] = len(attended_student_ids)
+
         # Recent requests
         ctx['recent_requests'] = ExamRequest.objects.select_related(
             'student'
@@ -1098,12 +969,16 @@ class AdminStudentDetailView(BaseAdminRequiredMixin, DetailView):
         # Exam history with results
         ctx['exam_results'] = StudentExamResult.objects.filter(
             student=student
-        ).select_related('exam_paper').order_by('-started_at')
+        ).select_related('exam_paper', 'exam_paper__category').order_by('-started_at')
 
         # Request history
         ctx['exam_requests'] = ExamRequest.objects.filter(
             student=student
         ).order_by('-requested_at')
+
+        # Certificate stats
+        ctx['certificates'] = Certificate.objects.filter(student=student).select_related('category')
+        ctx['certificate_count'] = ctx['certificates'].count()
 
         return ctx
 
@@ -1295,7 +1170,7 @@ class AdminEditQuestionView(BaseAdminRequiredMixin, View):
         })
 
 
-class AdminDeleteQuestionView(SuperuserRequiredMixin, View):
+class AdminDeleteQuestionView(BaseAdminRequiredMixin, View):
     """Soft-delete a question."""
 
     def post(self, request, pk):
@@ -1305,6 +1180,28 @@ class AdminDeleteQuestionView(SuperuserRequiredMixin, View):
         question.save()
         messages.success(request, 'Question removed from question bank.')
         return redirect('admin_category_detail', pk=category_id)
+
+
+class AdminBulkDeleteQuestionsView(BaseAdminRequiredMixin, View):
+    """Bulk delete selected questions (soft-delete)."""
+
+    def post(self, request):
+        selected_ids = request.POST.getlist('selected_ids')
+        category_id = request.POST.get('category_id')
+        
+        if not selected_ids:
+            messages.warning(request, "No questions selected for deletion.")
+            if category_id:
+                return redirect('admin_category_detail', pk=category_id)
+            return redirect('admin_dashboard')
+
+        # Soft delete: set is_active=False
+        count = Question.objects.filter(id__in=selected_ids).update(is_active=False)
+        messages.success(request, f"Successfully removed {count} questions from the question bank.")
+        
+        if category_id:
+            return redirect('admin_category_detail', pk=category_id)
+        return redirect('admin_questions')
 
 
 class AdminExamRequestsView(BaseAdminRequiredMixin, ListView):
@@ -1651,7 +1548,7 @@ class AdminEditCategoryView(BaseAdminRequiredMixin, View):
         return render(request, 'exams/admin/add_category.html', {'form': form, 'edit': True})
 
 
-class AdminDeleteCategoryView(SuperuserRequiredMixin, View):
+class AdminDeleteCategoryView(BaseAdminRequiredMixin, View):
     """Delete a category (cascades to questions and exam papers)."""
     
     def post(self, request, pk):
@@ -1677,7 +1574,7 @@ class AdminDeleteCategoryView(SuperuserRequiredMixin, View):
         return redirect('admin_categories')
 
 
-class AdminBulkDeleteCategoriesView(SuperuserRequiredMixin, View):
+class AdminBulkDeleteCategoriesView(BaseAdminRequiredMixin, View):
     """Bulk delete selected categories."""
     
     def post(self, request):
@@ -2069,6 +1966,36 @@ class PreviewCertificateView(View):
         response = HttpResponse(content_type="image/png")
         img.save(response, "PNG")
         return response
+
+
+
+# ════════════════════════════════════════════════
+#  NEW ANALYTICS & PERMISSION VIEWS
+# ════════════════════════════════════════════════
+
+class AdminNeverAttendedStudentsView(BaseAdminRequiredMixin, ListView):
+    """View list of students who registered but never took an exam."""
+    template_name = 'exams/admin/never_attended_students.html'
+    context_object_name = 'students'
+    paginate_by = 20
+
+    def get_queryset(self):
+        attended_student_ids = StudentExamResult.objects.values_list('student_id', flat=True).distinct()
+        return CustomUser.objects.filter(role='Student').exclude(id__in=attended_student_ids).order_by('-date_joined')
+
+
+class AdminStudentCertificateHistoryView(BaseAdminRequiredMixin, DetailView):
+    """Full certificate history for a specific student."""
+    template_name = 'exams/admin/student_certificate_history.html'
+    context_object_name = 'student'
+    model = CustomUser
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        student = self.object
+        # Certificates are stored in the Certificate model (unique per category)
+        ctx['certificates'] = Certificate.objects.filter(student=student).select_related('category').order_by('-updated_at')
+        return ctx
 
 
 # ════════════════════════════════════════════════

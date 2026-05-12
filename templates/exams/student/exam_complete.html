@@ -2,7 +2,7 @@
 {% block title %}Test Completed — Aptipro{% endblock %}
 
 {% block content %}
-<div class="card" style="max-width: 600px; margin: 40px auto; text-align: center; padding: 60px 40px;">
+<div class="card" style="max-width: 600px; margin: 40px auto; text-align: center; padding: 60px 40px; position: relative; {% if show_congratulations %}display: none;{% endif %}">
     <div style="font-size: 64px; margin-bottom: 24px;">🎉</div>
     <div class="card-title" style="font-size: 28px; margin-bottom: 16px;">Test Completed Successfully!</div>
     <p style="color: var(--text-secondary); font-size: 16px; line-height: 1.6; margin-bottom: 32px;">
@@ -17,9 +17,52 @@
         <a href="{% url 'student_history' %}" class="btn btn-outline" style="padding: 12px 32px;">View My History</a>
     </div>
 </div>
+
+{% if show_congratulations %}
+<!-- Congratulations Popup Overlay -->
+<div id="congratsModal" style="position: fixed; inset: 0; background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(10px); z-index: 1000; display: flex; align-items: center; justify-content: center; animation: fadeIn 0.3s ease; padding: 20px; box-sizing: border-box;">
+    <div class="card fade-in" style="max-width: 480px; width: 100%; max-height: calc(100vh - 40px); text-align: center; padding: 30px; border: 4px solid var(--accent-success); border-radius: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.4); overflow-y: auto; position: relative; background: linear-gradient(135deg, #ffffff, #f0fdf4); scrollbar-width: none; -ms-overflow-style: none;">
+        <style>
+            #congratsModal .card::-webkit-scrollbar { display: none; }
+        </style>
+        
+        <!-- Animated Background Elements -->
+        <div style="position: absolute; top: 15px; right: 15px; font-size: 80px; opacity: 0.2; pointer-events: none; transform: rotate(15deg); filter: contrast(1.2);">🏆</div>
+        <div style="position: absolute; bottom: 15px; left: 15px; font-size: 80px; opacity: 0.2; pointer-events: none; transform: rotate(-15deg); filter: contrast(1.2);">🌟</div>
+
+        <div style="font-size: 64px; margin-bottom: 16px; animation: bounce 2s infinite;">🎊</div>
+        <h1 style="font-size: 28px; color: var(--accent-success); margin-bottom: 8px; font-weight: 800;">Congratulations!</h1>
+        <p style="font-size: 16px; color: var(--text-primary); font-weight: 600; margin-bottom: 20px;">You have excelled in your exam!</p>
+        
+        <div style="background: white; padding: 20px; border-radius: 16px; border: 1px solid rgba(34, 197, 94, 0.3); margin-bottom: 24px; box-shadow: var(--shadow-sm);">
+            <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 6px;">Your Performance in {{ category_name }}</div>
+            <div style="font-size: 44px; font-weight: 900; color: var(--accent-success); line-height: 1;">{{ percentage }}%</div>
+            <div style="font-size: 14px; font-weight: 600; color: var(--text-secondary); margin-top: 8px;">{{ marks }} / {{ total }} Marks</div>
+        </div>
+
+        <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 24px; line-height: 1.5; padding: 0 10px;">
+            Fantastic work! Your certificate is being generated and will be sent to your registered email shortly.
+        </p>
+
+        <button onclick="closeCongrats()" class="btn btn-primary" style="width: 100%; padding: 14px; font-size: 16px; border-radius: 12px; cursor: pointer; border: none; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);">Continue to Dashboard</button>
+    </div>
+</div>
+
+<style>
+    @keyframes bounce {
+        0%, 100% { transform: translateY(0) scale(1); }
+        50% { transform: translateY(-10px) scale(1.1); }
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+</style>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 <script>
     // Prevent Back Navigation from completion page back to the test
     (function() {
@@ -30,5 +73,65 @@
             });
         }
     })();
+
+    {% if show_congratulations %}
+    function fireConfetti() {
+        var duration = 5 * 1000;
+        var animationEnd = Date.now() + duration;
+        var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 2000 };
+
+        function randomInRange(min, max) {
+            return Math.random() * (max - min) + min;
+        }
+
+        var interval = setInterval(function() {
+            var timeLeft = animationEnd - Date.now();
+
+            if (timeLeft <= 0) {
+                return clearInterval(interval);
+            }
+
+            var particleCount = 50 * (timeLeft / duration);
+            confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
+            confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
+        }, 250);
+    }
+
+    // Fire immediately on load
+    window.addEventListener('DOMContentLoaded', (event) => {
+        fireConfetti();
+        // Also fire some stars
+        var end = Date.now() + (2 * 1000);
+        (function frame() {
+            confetti({
+                particleCount: 2,
+                angle: 60,
+                spread: 55,
+                origin: { x: 0 },
+                zIndex: 2000
+            });
+            confetti({
+                particleCount: 2,
+                angle: 120,
+                spread: 55,
+                origin: { x: 1 },
+                zIndex: 2000
+            });
+
+            if (Date.now() < end) {
+                requestAnimationFrame(frame);
+            }
+        }());
+    });
+
+    function closeCongrats() {
+        const modal = document.getElementById('congratsModal');
+        modal.style.opacity = '0';
+        modal.style.transition = 'opacity 0.3s ease';
+        setTimeout(() => {
+            window.location.href = "{% url 'student_dashboard' %}";
+        }, 300);
+    }
+    {% endif %}
 </script>
 {% endblock %}

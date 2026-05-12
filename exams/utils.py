@@ -189,13 +189,29 @@ def generate_and_send_certificate(result):
     from django.core.mail import EmailMessage
     from django.utils import timezone
 
+    from .models import Certificate
+    
     student = result.student
     student_name = f"{student.first_name} {student.last_name}".strip() or student.username
-    course_name = result.exam_paper.category.name if result.exam_paper and result.exam_paper.category else "Aptitude Course"
+    category = result.exam_paper.category
+    course_name = category.name if category else "Aptitude Course"
     score = float(result.percentage())
     date_str = timezone.now().strftime("%B %Y")
 
-    # 1. Scale & Resolution (300 DPI: 3508 x 2480)
+    # 1. Update or Create Certificate record
+    # Enforces "One student + One course/category = Only ONE certificate record"
+    certificate, created = Certificate.objects.update_or_create(
+        student=student,
+        category=category,
+        defaults={
+            'marks': result.total_marks_obtained,
+            'percentage': result.percentage(),
+            'total_marks': result.total_marks_possible,
+            'exam_date': result.completed_at or timezone.now(),
+        }
+    )
+
+    # 2. Scale & Resolution (300 DPI: 3508 x 2480)
     WIDTH, HEIGHT = 3508, 2480
     SCALE = WIDTH / 1414.0 # Base scale relative to 1414 width
     

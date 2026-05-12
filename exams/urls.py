@@ -9,9 +9,7 @@ urlpatterns = [
     # ── Authentication ───────────────────────────
     path('', views.LoginView.as_view(), name='home'),
     path('register/', views.RegisterView.as_view(), name='register'),
-    path('verify-registration-otp/', views.VerifyRegistrationOTPView.as_view(), name='verify_registration_otp'),
-    path('api/otp/send/', views.SendRegistrationOTPAPI.as_view(), name='api_send_otp'),
-    path('api/otp/verify/', views.VerifyRegistrationOTPAPI.as_view(), name='api_verify_otp'),
+
     path('login/', views.LoginView.as_view(), name='login'),
     path('logout/', views.LogoutView.as_view(), name='logout'),
     path('forgot-password/', views.ForgotPasswordView.as_view(), name='forgot_password'),
@@ -46,6 +44,8 @@ urlpatterns = [
     path('admin-panel/categories/<int:pk>/toggle/', views.AdminToggleCategoryStatusView.as_view(), name='admin_toggle_category'),
     path('admin-panel/students/', views.AdminStudentsView.as_view(), name='admin_students'),
     path('admin-panel/students/<int:pk>/', views.AdminStudentDetailView.as_view(), name='admin_student_detail'),
+    path('admin-panel/students/<int:pk>/certificates/', views.AdminStudentCertificateHistoryView.as_view(), name='admin_student_certificates'),
+    path('admin-panel/students/never-attended/', views.AdminNeverAttendedStudentsView.as_view(), name='admin_never_attended_students'),
     path('admin-panel/students/<int:pk>/delete/', views.AdminDeleteStudentView.as_view(), name='admin_delete_student'),
     path('admin-panel/questions/', views.AdminQuestionsView.as_view(), name='admin_questions'),
     path('admin-panel/questions/add/', views.AdminAddQuestionView.as_view(), name='admin_add_question'),
@@ -55,6 +55,7 @@ urlpatterns = [
     path('admin-panel/questions/<uuid:pk>/view/', views.AdminQuestionDetailView.as_view(), name='admin_view_question'),
     path('admin-panel/questions/<uuid:pk>/edit/', views.AdminEditQuestionView.as_view(), name='admin_edit_question'),
     path('admin-panel/questions/<uuid:pk>/delete/', views.AdminDeleteQuestionView.as_view(), name='admin_delete_question'),
+    path('admin-panel/questions/bulk-delete/', views.AdminBulkDeleteQuestionsView.as_view(), name='admin_bulk_delete_questions'),
     path('admin-panel/requests/', views.AdminExamRequestsView.as_view(), name='admin_exam_requests'),
     path('admin-panel/requests/<uuid:request_id>/approve/', views.AdminApproveRequestView.as_view(), name='admin_approve_request'),
     path('admin-panel/requests/<uuid:request_id>/reject/', views.AdminRejectRequestView.as_view(), name='admin_reject_request'),

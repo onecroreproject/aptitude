@@ -29,63 +29,82 @@
   </div>
 
   <!-- Search Filter -->
-  <form method="GET" style="margin-bottom: 24px; display: flex; gap: 12px;">
-    <input type="text" name="search" value="{{ search }}" placeholder="Search questions..." class="form-input" style="max-width: 400px; flex: 1;">
-    <button type="submit" class="btn btn-secondary">Search</button>
-  </form>
-  
-  <div class="table-container">
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Question Text</th>
-          <th>Type</th>
-          <th>Difficulty</th>
-          <th>Marks</th>
-          <th>Time Limit</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for question in questions %}
-          <tr>
-            <td style="max-width: 400px;">
-              <div style="font-weight: 500; color: var(--text-primary);">
-                {{ question.question_text|truncatechars:100 }}
-              </div>
-            </td>
-            <td><span class="badge badge-info">{{ question.get_question_type_display }}</span></td>
-            <td>
-              <span class="difficulty-badge {% if question.difficulty == 'Easy' %}easy{% elif question.difficulty == 'Medium' %}medium{% else %}hard{% endif %}">
-                {{ question.difficulty }}
-              </span>
-            </td>
-            <td style="font-weight: 700;">{{ question.marks }} pts</td>
-            <td>{{ question.time_limit_minutes }} min</td>
-            <td>
-              <div style="display: flex; gap: 8px;">
-                <a href="{% url 'admin_view_question' question.pk %}" class="btn-action btn-view" title="View Question">👁️</a>
-                <a href="{% url 'admin_edit_question' question.pk %}" class="btn-action btn-edit" title="Edit Question">✏️</a>
-                {% if user.is_superuser %}
-                <form action="{% url 'admin_delete_question' question.pk %}" method="POST" 
-                      onsubmit="confirmAction({event: event, title: 'Remove Question?', text: 'Are you sure you want to remove this question from this category?', confirmButtonText: 'Yes, Remove', callback: () => this.submit()});">
-                  {% csrf_token %}
-                  <button type="submit" class="btn-action btn-delete" title="Delete Question">🗑️</button>
-                </form>
-                {% endif %}
-              </div>
-            </td>
-          </tr>
-        {% empty %}
-          <tr>
-            <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 48px;">
-              No questions found for this category.
-            </td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; gap: 16px;">
+    <form method="GET" style="display: flex; gap: 12px; flex: 1;">
+      <input type="text" name="search" value="{{ search }}" placeholder="Search questions..." class="form-input" style="max-width: 400px; flex: 1;">
+      <button type="submit" class="btn btn-secondary">Search</button>
+    </form>
   </div>
+  
+  <form id="bulk-delete-form" action="{% url 'admin_bulk_delete_questions' %}" method="POST" 
+        onsubmit="confirmAction({event: event, title: 'Delete Selected Questions?', text: 'Are you sure you want to remove these questions from the question bank?', confirmButtonText: 'Yes, Remove All', callback: () => this.submit()});">
+    {% csrf_token %}
+    <input type="hidden" name="category_id" value="{{ category.id }}">
+
+    {% if user.is_superuser or user.role == 'Sub Admin' %}
+    <div style="margin-bottom: 16px; display: none; animation: fadeIn 0.3s ease;" id="bulk-actions-bar">
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px 20px; background: #fff5f5; border: 1px solid #feb2b2; border-radius: 12px;">
+        <span style="font-size: 14px; font-weight: 600; color: #c53030;" id="selected-count">0 questions selected</span>
+        <button type="submit" class="btn btn-danger btn-sm" style="background: #e53e3e; color: #fff;">🗑️ Delete Selected</button>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width: 40px;"><input type="checkbox" id="select-all"></th>
+            <th>Question Text</th>
+            <th>Type</th>
+            <th>Difficulty</th>
+            <th>Marks</th>
+            <th>Time Limit</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for question in questions %}
+            <tr>
+              <td><input type="checkbox" name="selected_ids" value="{{ question.id }}" class="record-checkbox"></td>
+              <td style="max-width: 400px;">
+                <div style="font-weight: 500; color: var(--text-primary);">
+                  {{ question.question_text|truncatechars:100 }}
+                </div>
+              </td>
+              <td><span class="badge badge-info">{{ question.get_question_type_display }}</span></td>
+              <td>
+                <span class="difficulty-badge {% if question.difficulty == 'Easy' %}easy{% elif question.difficulty == 'Medium' %}medium{% else %}hard{% endif %}">
+                  {{ question.difficulty }}
+                </span>
+              </td>
+              <td style="font-weight: 700;">{{ question.marks }} pts</td>
+              <td>{{ question.time_limit_minutes }} min</td>
+              <td>
+                <div style="display: flex; gap: 8px;">
+                  <a href="{% url 'admin_view_question' question.pk %}" class="btn-action btn-view" title="View Question">👁️</a>
+                  <a href="{% url 'admin_edit_question' question.pk %}" class="btn-action btn-edit" title="Edit Question">✏️</a>
+                  {% if user.is_superuser or user.role == 'Sub Admin' %}
+                  <form action="{% url 'admin_delete_question' question.pk %}" method="POST" 
+                        onsubmit="confirmAction({event: event, title: 'Remove Question?', text: 'Are you sure you want to remove this question from this category?', confirmButtonText: 'Yes, Remove', callback: () => this.submit()});">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-action btn-delete" title="Delete Question">🗑️</button>
+                  </form>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 48px;">
+                No questions found for this category.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </form>
 
   {% if is_paginated %}
     <div style="margin-top: 24px; display: flex; justify-content: center; gap: 8px;">
@@ -99,4 +118,36 @@
     </div>
   {% endif %}
 </div>
+
+<script>
+  const selectAll = document.getElementById('select-all');
+  const checkboxes = document.querySelectorAll('.record-checkbox');
+  const bulkBar = document.getElementById('bulk-actions-bar');
+  const countSpan = document.getElementById('selected-count');
+
+  function updateBulkBar() {
+      const checkedCount = document.querySelectorAll('.record-checkbox:checked').length;
+      if (bulkBar) {
+          bulkBar.style.display = checkedCount > 0 ? 'block' : 'none';
+          countSpan.textContent = `${checkedCount} question${checkedCount > 1 ? 's' : ''} selected`;
+      }
+  }
+
+  if (selectAll) {
+      selectAll.addEventListener('change', () => {
+          checkboxes.forEach(cb => {
+              cb.checked = selectAll.checked;
+          });
+          updateBulkBar();
+      });
+  }
+
+  checkboxes.forEach(cb => {
+      cb.addEventListener('change', () => {
+          updateBulkBar();
+          if (!cb.checked) selectAll.checked = false;
+          if (document.querySelectorAll('.record-checkbox:checked').length === checkboxes.length) selectAll.checked = true;
+      });
+  });
+</script>
 {% endblock %}

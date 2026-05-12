@@ -4,135 +4,206 @@
 
 {% block content %}
 <div style="margin-bottom: 24px;">
-    <a href="{% url 'admin_students' %}" style="text-decoration: none; color: var(--text-secondary); font-size: 14px; display: flex; align-items: center; gap: 4px;">
-        ← Back to Students
+    <a href="{% url 'admin_students' %}" style="text-decoration: none; color: var(--text-secondary); font-size: 14px; display: flex; align-items: center; gap: 8px; font-weight: 500; transition: color 0.2s;">
+        <span style="font-size: 18px;">←</span> Back to Student List
     </a>
 </div>
 
-<div class="card">
-    <div class="card-title" style="margin-bottom: 32px; display: flex; align-items: center; gap: 24px;">
-        {% if student.profile_photo %}
-            <img src="{{ student.profile_photo.url }}" alt="Profile" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 4px solid var(--accent-primary-light); box-shadow: var(--shadow-sm);">
-        {% else %}
-            <div style="width: 80px; height: 80px; border-radius: 50%; background: var(--accent-primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: 800;">
-                {{ student.username.0|upper }}
-            </div>
-        {% endif %}
-        <div style="flex: 1;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-                <div style="font-size: 24px;">{{ student.name|default:student.username }}</div>
-                {% if user.is_superuser %}
-                <form action="{% url 'admin_delete_student' student.id %}" method="POST" 
-                      onsubmit="confirmAction({event: event, title: 'Remove Student?', text: 'Permanently remove this student? All history will be deleted.', confirmButtonText: 'Yes, Delete All', callback: () => this.submit()});" style="display:inline;">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-outline" style="color: var(--accent-danger); border-color: var(--accent-danger); padding: 8px 16px; font-size: 13px;">
-                        🗑️ Delete Student
-                    </button>
-                </form>
-                {% endif %}
-            </div>
-            <div style="font-size: 14px; color: var(--text-secondary); font-weight: 400;">Joined on {{ student.date_joined|date:"M d, Y" }}</div>
-        </div>
+<!-- Main Profile Header Card -->
+<div class="card" style="padding: 0; overflow: hidden; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.05); margin-bottom: 32px;">
+    <div style="background: linear-gradient(135deg, #e8edf3 0%, #bceff3 100%); height: 120px; position: relative;">
+        <!-- Banner Decoration -->
+        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0.1; background-image: radial-gradient(#fff 1px, transparent 1px); background-size: 20px 20px;"></div>
     </div>
+    
+    <div style="padding: 0 40px 40px; position: relative;">
+        <!-- Profile Image & Basic Info -->
+        <div style="display: flex; align-items: flex-end; gap: 24px; margin-top: -60px; margin-bottom: 32px; flex-wrap: wrap;">
+            {% if student.profile_photo %}
+                <img src="{{ student.profile_photo.url }}" alt="Profile" style="width: 140px; height: 140px; border-radius: 24px; object-fit: cover; border: 6px solid #fff; box-shadow: var(--shadow-md); background: #fff;">
+            {% else %}
+                <div style="width: 140px; height: 140px; border-radius: 24px; background: #fff; border: 6px solid #fff; box-shadow: var(--shadow-md); display: flex; align-items: center; justify-content: center;">
+                    <div style="width: 100%; height: 100%; border-radius: 18px; background: var(--accent-primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 56px; font-weight: 800;">
+                        {{ student.username.0|upper }}
+                    </div>
+                </div>
+            {% endif %}
+            
+            <div style="flex: 1; padding-bottom: 10px; min-width: 250px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+                    <div>
+                        <h1 style="font-size: 32px; font-weight: 800; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 12px;">
+                            {{ student.name|default:student.username }}
+                            {% if student.is_active %}
+                                <span style="font-size: 10px; padding: 4px 12px; background: #ecfdf5; color: #10b981; border-radius: 20px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; border: 1px solid #d1fae5;">Active</span>
+                            {% else %}
+                                <span style="font-size: 10px; padding: 4px 12px; background: #fef2f2; color: #ef4444; border-radius: 20px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; border: 1px solid #fee2e2;">Disabled</span>
+                            {% endif %}
+                        </h1>
+                        <p style="color: var(--text-secondary); margin: 8px 0 0; font-size: 16px; display: flex; align-items: center; gap: 6px;">
+                            <span style="opacity: 0.6;">📅</span> Member since {{ student.date_joined|date:"F d, Y" }}
+                        </p>
+                    </div>
+                    
+                    {% if user.is_superuser %}
+                    <form action="{% url 'admin_delete_student' student.id %}" method="POST" 
+                          onsubmit="confirmAction({event: event, title: 'Remove Student?', text: 'Are you sure you want to permanently remove this student and all their exam records?', confirmButtonText: 'Delete Permanently', callback: () => this.submit()});">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline" style="color: #ef4444; border-color: #fecaca; background: #fff; padding: 10px 20px; border-radius: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px; transition: all 0.2s;">
+                            <span>🗑️</span> Delete Student
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
 
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 32px; padding: 24px; background: var(--bg-secondary); border-radius: 12px; border: 1px solid var(--border-color);">
-        <div>
-            <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Username</div>
-            <div style="font-weight: 600;">@{{ student.username }}</div>
-        </div>
-        <div>
-            <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Email Address</div>
-            <div style="font-weight: 600;">{{ student.email|default:"—" }}</div>
-        </div>
-        <div>
-            <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Phone Number</div>
-            <div style="font-weight: 600;">{{ student.phone_number|default:"—" }}</div>
-        </div>
-        <div>
-            <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">WhatsApp</div>
-            <div style="font-weight: 600; color: var(--accent-success);">{{ student.whatsapp_number|default:"—" }}</div>
-        </div>
-        <div>
-            <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Date of Birth</div>
-            <div style="font-weight: 600;">{{ student.date_of_birth|date:"M d, Y"|default:"—" }}</div>
-        </div>
-        <div>
-            <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Institution</div>
-            <div style="font-weight: 600;">{{ student.institution|default:"—" }}</div>
-        </div>
-        <div>
-            <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Status</div>
-            <div>
-                {% if student.is_active %}
-                    <span class="badge badge-approved">Active</span>
-                {% else %}
-                    <span class="badge badge-rejected">Disabled</span>
-                {% endif %}
+        <!-- Details Grid & Certificate Card -->
+        <div style="display: grid; grid-template-columns: 3fr 1.2fr; gap: 32px; align-items: start;">
+            <!-- Personal Information Grid -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px; padding: 32px; background: #fbfcfe; border-radius: 24px; border: 1px solid #edf2f7;">
+                <div style="grid-column: 1 / -1; margin-bottom: 8px;">
+                    <h3 style="font-size: 14px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); margin: 0; font-weight: 700;">Personal Information</h3>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 600;">USERNAME</span>
+                    <span style="font-size: 15px; font-weight: 700; color: var(--text-primary);">@{{ student.username }}</span>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 600;">EMAIL ADDRESS</span>
+                    <span style="font-size: 15px; font-weight: 700; color: var(--text-primary); word-break: break-all;">{{ student.email|default:"—" }}</span>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 600;">PHONE</span>
+                    <span style="font-size: 15px; font-weight: 700; color: var(--text-primary);">{{ student.phone_number|default:"—" }}</span>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 600;">WHATSAPP</span>
+                    <span style="font-size: 15px; font-weight: 700; color: #22c55e;">{{ student.whatsapp_number|default:"—" }}</span>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 600;">DATE OF BIRTH</span>
+                    <span style="font-size: 15px; font-weight: 700; color: var(--text-primary);">{{ student.date_of_birth|date:"M d, Y"|default:"—" }}</span>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 600;">INSTITUTION</span>
+                    <span style="font-size: 15px; font-weight: 700; color: var(--text-primary);">{{ student.institution|default:"—" }}</span>
+                </div>
+            </div>
+
+            <!-- Enhanced Certificate Card -->
+            <div onclick="location.href='{% url 'admin_student_certificates' student.id %}'" 
+                 style="cursor: pointer; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); padding: 32px; border-radius: 24px; border: 1px solid #bae6fd; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden; height: 100%; box-sizing: border-box;">
+                <div style="position: absolute; top: -10px; right: -10px; font-size: 64px; opacity: 0.1;">📜</div>
+                <div style="width: 60px; height: 60px; background: #fff; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 28px; box-shadow: 0 4px 12px rgba(12, 74, 110, 0.1);">🏆</div>
+                <div style="text-align: center;">
+                    <div style="font-size: 14px; color: #0369a1; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Certificates</div>
+                    <div style="font-size: 48px; font-weight: 900; color: #0c4a6e; line-height: 1.2; margin: 4px 0;">{{ certificate_count }}</div>
+                    <div style="font-size: 13px; color: #0c4a6e; font-weight: 600; opacity: 0.8;">Click to View History →</div>
+                </div>
+                
+                <style>
+                    div[onclick]:hover { transform: translateY(-5px); box-shadow: 0 12px 24px rgba(12, 74, 110, 0.1); border-color: #7dd3fc; }
+                </style>
             </div>
         </div>
     </div>
 </div>
 
-<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 32px; margin-top: 32px;">
-    <!-- Exam History -->
-    <div class="card">
-        <div class="card-title" style="margin-bottom: 24px;">📝 Completed Exams</div>
-        <div class="table-container">
-            <table class="data-table">
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 32px;">
+    <!-- Exam History Card -->
+    <div class="card" style="padding: 32px; border-radius: 24px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.05);">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
+            <h2 style="font-size: 20px; font-weight: 800; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 10px;">
+                <span style="background: #f1f5f9; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 10px;">📝</span>
+                Completed Exams
+            </h2>
+            <span style="font-size: 13px; color: var(--text-muted); font-weight: 600; background: #f1f5f9; padding: 4px 12px; border-radius: 20px;">{{ exam_results|length }} Total Attempts</span>
+        </div>
+        
+        <div class="table-container" style="border: 1px solid #edf2f7; border-radius: 16px; overflow: hidden;">
+            <table class="data-table" style="margin: 0;">
                 <thead>
-                    <tr>
-                        <th>Exam Paper</th>
-                        <th>Date</th>
-                        <th>Score</th>
-                        <th>Result</th>
-                        <th>Action</th>
+                    <tr style="background: #fbfcfe;">
+                        <th style="padding: 16px 20px;">Exam Topic</th>
+                        <th>Submission Date</th>
+                        <th>Score Detail</th>
+                        <th>Percentage</th>
+                        <th style="text-align: right; padding-right: 20px;">Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for r in exam_results %}
-                    <tr>
-                        <td style="font-weight: 600;">{{ r.exam_paper.category.name }}</td>
-                        <td style="font-size: 12px;">{{ r.submitted_at|date:"M d, Y" }}</td>
-                        <td>{{ r.total_marks_obtained }} / {{ r.total_marks_possible }}</td>
+                    <tr style="border-bottom: 1px solid #edf2f7; transition: background 0.2s;">
+                        <td style="padding: 16px 20px; font-weight: 700; color: var(--text-primary);">{{ r.exam_paper.category.name }}</td>
+                        <td style="font-size: 13px; color: var(--text-secondary);">{{ r.submitted_at|date:"M d, Y" }}</td>
+                        <td style="font-weight: 600;">{{ r.total_marks_obtained }} <span style="color: var(--text-muted); font-weight: 400;">/ {{ r.total_marks_possible }}</span></td>
                         <td>
-                            <span class="badge {% if r.is_passed %}badge-approved{% else %}badge-rejected{% endif %}">
-                                {{ r.percentage }}%
-                            </span>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <div style="flex: 1; min-width: 60px; height: 6px; background: #f1f5f9; border-radius: 10px; overflow: hidden;">
+                                    <div style="height: 100%; width: {{ r.percentage }}%; background: {% if r.is_passed %}#22c55e{% else %}#ef4444{% endif %}; border-radius: 10px;"></div>
+                                </div>
+                                <span style="font-size: 13px; font-weight: 700; color: {% if r.is_passed %}#15803d{% else %}#b91c1c{% endif %};">{{ r.percentage }}%</span>
+                            </div>
                         </td>
-                        <td><a href="{% url 'admin_result_detail' r.id %}" class="btn btn-outline btn-sm">View Report</a></td>
+                        <td style="text-align: right; padding-right: 20px;">
+                            <a href="{% url 'admin_result_detail' r.id %}" class="btn btn-outline btn-sm" style="border-radius: 8px; font-size: 12px; padding: 6px 12px;">Report</a>
+                        </td>
                     </tr>
+                    <style>
+                        tr:hover { background: #f8fafc; }
+                    </style>
                     {% empty %}
-                    <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 32px;">No exam history.</td></tr>
+                    <tr>
+                        <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 48px;">
+                            <div style="font-size: 32px; margin-bottom: 12px;">📁</div>
+                            <div style="font-weight: 600;">No exam history available for this student.</div>
+                        </td>
+                    </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
 
-    <!-- Exam Requests -->
-    <div class="card">
-        <div class="card-title" style="margin-bottom: 24px;">⚖️ Request History</div>
-        <div class="table-container">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Subject</th>
-                        <th>Status</th>
-                        <th>Date</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for req in exam_requests %}
-                    <tr>
-                        <td>{{ req.category.name }}</td>
-                        <td><span class="badge badge-{{ req.status|lower }}">{{ req.status }}</span></td>
-                        <td style="font-size: 11px;">{{ req.requested_at|date:"M d" }}</td>
-                    </tr>
-                    {% empty %}
-                    <tr><td colspan="3" style="text-align: center; color: var(--text-muted); padding: 32px;">No requests.</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    <!-- Request History Card -->
+    <div class="card" style="padding: 32px; border-radius: 24px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.05);">
+        <h2 style="font-size: 20px; font-weight: 800; color: var(--text-primary); margin: 0 0 24px; display: flex; align-items: center; gap: 10px;">
+            <span style="background: #f1f5f9; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 10px;">⚖️</span>
+            Exam Requests
+        </h2>
+        
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+            {% for req in exam_requests %}
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px; background: #fbfcfe; border: 1px solid #edf2f7; border-radius: 16px; transition: all 0.2s;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 10px; height: 10px; border-radius: 50%; background: {% if req.status == 'Approved' %}#22c55e{% elif req.status == 'Pending' %}#f59e0b{% else %}#ef4444{% endif %};"></div>
+                    <div>
+                        <div style="font-weight: 700; font-size: 14px; color: var(--text-primary);">{{ req.category.name }}</div>
+                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">{{ req.requested_at|date:"M d, Y" }}</div>
+                    </div>
+                </div>
+                <span class="badge" style="
+                    padding: 4px 10px; 
+                    font-size: 11px; 
+                    border-radius: 8px; 
+                    font-weight: 700;
+                    {% if req.status == 'Approved' %}background: #ecfdf5; color: #10b981; border: 1px solid #d1fae5;
+                    {% elif req.status == 'Pending' %}background: #fffbeb; color: #d97706; border: 1px solid #fef3c7;
+                    {% else %}background: #fef2f2; color: #ef4444; border: 1px solid #fee2e2;{% endif %}
+                ">{{ req.status }}</span>
+            </div>
+            {% empty %}
+            <div style="text-align: center; color: var(--text-muted); padding: 32px 0;">
+                No request history found.
+            </div>
+            {% endfor %}
         </div>
     </div>
 </div>
