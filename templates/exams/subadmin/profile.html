@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block title %}Sub-Admin Profile — Aptipro{% endblock %}
+{% block page_title %}Sub-Admin Profile Settings{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 800px; margin: 0 auto;">
+    <div class="card-title" style="margin-bottom: 32px;">👤 Sub-Admin Account Settings</div>
+
+    <div class="card-body">
+        <form method="post" enctype="multipart/form-data" id="profile-form">
+            {% csrf_token %}
+
+            <!-- Profile Photo Header -->
+            <div style="display: flex; align-items: center; gap: 24px; margin-bottom: 32px; padding: 20px; background: var(--bg-primary); border-radius: 12px; border: 1.5px dashed var(--border-color);">
+                {% if user.profile_photo %}
+                <img src="{{ user.profile_photo.url }}" alt="Profile" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 4px solid #fff; box-shadow: var(--shadow-md);">
+                {% else %}
+                <div style="width: 100px; height: 100px; border-radius: 50%; background: var(--accent-primary-light); color: var(--accent-primary); display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: 800; border: 4px solid #fff; box-shadow: var(--shadow-sm);">
+                    {{ user.username.0|upper }}
+                </div>
+                {% endif %}
+                <div>
+                    <h3 style="font-size: 18px; font-weight: 700; color: var(--text-primary);">{{ user.name }}</h3>
+                    <p style="font-size: 14px; color: var(--text-secondary); margin-top: 4px;">Update your sub-admin profile details below.</p>
+                </div>
+            </div>
+
+            <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                {% for field in form %}
+                <div class="form-group" style="{% if field.name == 'profile_photo' %}grid-column: span 2;{% endif %}">
+                    <label class="label">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.errors %}<div class="form-error" style="color: var(--accent-danger); font-size: 12px; margin-top: 4px;">{{ field.errors.0 }}</div>{% endif %}
+                </div>
+                {% endfor %}
+            </div>
+
+            <div style="margin-top: 40px; border-top: 1px solid var(--border-color); padding-top: 24px; display: flex; justify-content: flex-end;">
+                <button type="submit" class="btn btn-primary" style="padding: 12px 32px;">Save Profile Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

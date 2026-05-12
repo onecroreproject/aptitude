@@ -24,6 +24,7 @@ from .forms import (
     StudentRegistrationForm,
     CustomLoginForm,
     StudentProfileForm,
+    AdminProfileForm,
     CategoryForm,
     QuestionForm,
     ExamRequestForm,
@@ -452,6 +453,38 @@ class StudentProfileView(StudentRequiredMixin, View):
             messages.success(request, 'Profile updated successfully.')
             return redirect('student_profile')
         return render(request, 'exams/student/profile.html', {'form': form})
+
+
+class AdminProfileView(SuperuserRequiredMixin, View):
+    """View and update admin profile."""
+
+    def get(self, request):
+        form = AdminProfileForm(instance=request.user)
+        return render(request, 'exams/admin/profile.html', {'form': form})
+
+    def post(self, request):
+        form = AdminProfileForm(request.POST, request.FILES, instance=request.user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Profile updated successfully.')
+            return redirect('admin_profile')
+        return render(request, 'exams/admin/profile.html', {'form': form})
+
+
+class SubAdminProfileView(BaseAdminRequiredMixin, View):
+    """View and update sub-admin profile."""
+
+    def get(self, request):
+        form = AdminProfileForm(instance=request.user)
+        return render(request, 'exams/subadmin/profile.html', {'form': form})
+
+    def post(self, request):
+        form = AdminProfileForm(request.POST, request.FILES, instance=request.user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Profile updated successfully.')
+            return redirect('subadmin_profile')
+        return render(request, 'exams/subadmin/profile.html', {'form': form})
 
 
 class RequestExamView(StudentRequiredMixin, View):
@@ -1699,13 +1732,31 @@ class PreviewCertificateView(View):
 
         def get_font(font_name, size):
             scaled_size = int(size * SCALE)
+            # Potential font paths on Linux
+            linux_font_paths = [
+                "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf",
+                "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                "/usr/share/fonts/truetype/freefont/FreeSerif.ttf",
+                "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+            ]
+            
+            # 1. Try requested font
             try:
                 return ImageFont.truetype(font_name, scaled_size)
             except OSError:
+                pass
+                
+            # 2. Try common system fonts
+            for path in ["arial.ttf", "times.ttf", "Arial.ttf", "Times.ttf"] + linux_font_paths:
                 try:
-                    return ImageFont.truetype("arial.ttf", scaled_size)
+                    return ImageFont.truetype(path, scaled_size)
                 except OSError:
-                    return ImageFont.load_default()
+                    continue
+                    
+            # 3. Last resort (will be small)
+            return ImageFont.load_default()
 
         # Scaled Fonts
         font_cert = get_font("times.ttf", 85)
@@ -1781,14 +1832,14 @@ class PreviewCertificateView(View):
                 vibrancy = ImageEnhance.Color(sharpness).enhance(1.6)
                 logo = vibrancy
                 
-                # 2. Increase size slightly
-                logo.thumbnail((int(900*SCALE), int(300*SCALE)), Image.Resampling.LANCZOS)
+                # 2. Adjusted size for better balance
+                logo.thumbnail((int(650*SCALE), int(300*SCALE)), Image.Resampling.LANCZOS)
                 
                 lx = int(20*SCALE)
-                ly = int(20*SCALE)
+                ly = int(40*SCALE)
                 
                 # 3. Premium Soft White Glow effect
-                glow_size = int(8 * SCALE)
+                glow_size = int(10 * SCALE)
                 glow = Image.new("RGBA", (logo.width + glow_size*2, logo.height + glow_size*2), (0, 0, 0, 0))
                 glow_mask = logo.split()[3]
                 glow_silhouette = Image.new("RGBA", logo.size, (255, 255, 255, 70))
@@ -1814,7 +1865,7 @@ class PreviewCertificateView(View):
 
         # 5. Main Text Content
         # "CERTIFICATE" (with deep shadow)
-        draw.text((707*SCALE + 3, 120*SCALE + 3), "CERTIFICATE", font=font_cert, fill="#00000044", anchor="mm")
+        draw.text((707*SCALE + 3*SCALE, 120*SCALE + 3*SCALE), "CERTIFICATE", font=font_cert, fill="#00000044", anchor="mm")
         draw.text((707*SCALE, 120*SCALE), "CERTIFICATE", font=font_cert, fill="#C5A028", anchor="mm") # Gold Title
         
         # "OF ACHIEVEMENT" Pill
@@ -1903,7 +1954,7 @@ class PreviewCertificateView(View):
                 sig_img = sharpness_enhancer.enhance(2.5) 
                 
                 sx = int(300*SCALE - (sig_img.width // 2))
-                # Move further downward (baseline shifted to 1080)
+                # Move to the absolute bottom, almost touching the border line
                 sy = int(1080*SCALE - sig_img.height)
                 img.paste(sig_img, (sx, sy), sig_img)
             except Exception:

@@ -220,13 +220,31 @@ def generate_and_send_certificate(result):
 
     def get_font(font_name, size):
         scaled_size = int(size * SCALE)
+        # Potential font paths on Linux
+        linux_font_paths = [
+            "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/freefont/FreeSerif.ttf",
+            "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+        ]
+        
+        # 1. Try requested font
         try:
             return ImageFont.truetype(font_name, scaled_size)
         except OSError:
+            pass
+            
+        # 2. Try common system fonts
+        for path in ["arial.ttf", "times.ttf", "Arial.ttf", "Times.ttf"] + linux_font_paths:
             try:
-                return ImageFont.truetype("arial.ttf", scaled_size)
+                return ImageFont.truetype(path, scaled_size)
             except OSError:
-                return ImageFont.load_default()
+                continue
+                
+        # 3. Last resort (will be small)
+        return ImageFont.load_default()
 
     # Scaled Fonts
     font_cert = get_font("times.ttf", 85)
@@ -293,14 +311,14 @@ def generate_and_send_certificate(result):
             vibrancy = ImageEnhance.Color(sharpness).enhance(1.6) # +60% Saturation (Green focus)
             logo = vibrancy
             
-            # 2. Increase size slightly (maintained from previous step)
-            logo.thumbnail((int(900*SCALE), int(300*SCALE)), Image.Resampling.LANCZOS)
+            # 2. Adjusted size for better balance
+            logo.thumbnail((int(650*SCALE), int(300*SCALE)), Image.Resampling.LANCZOS)
             
             lx = int(20*SCALE)
-            ly = int(20*SCALE)
+            ly = int(40*SCALE)
             
             # 3. Premium Soft White Glow effect
-            glow_size = int(8 * SCALE)
+            glow_size = int(10 * SCALE)
             glow = Image.new("RGBA", (logo.width + glow_size*2, logo.height + glow_size*2), (0, 0, 0, 0))
             # Paste a soft white silhouette for glow
             glow_mask = logo.split()[3]
@@ -327,7 +345,7 @@ def generate_and_send_certificate(result):
 
     # 5. Main Text Content
     # "CERTIFICATE" (with deep shadow)
-    draw.text((707*SCALE + 3, 120*SCALE + 3), "CERTIFICATE", font=font_cert, fill="#00000044", anchor="mm")
+    draw.text((707*SCALE + 3*SCALE, 120*SCALE + 3*SCALE), "CERTIFICATE", font=font_cert, fill="#00000044", anchor="mm")
     draw.text((707*SCALE, 120*SCALE), "CERTIFICATE", font=font_cert, fill="#C5A028", anchor="mm") # Gold Title
     
     # "OF ACHIEVEMENT" Pill
@@ -361,9 +379,9 @@ def generate_and_send_certificate(result):
     
     # Draw Depth Layers
     # 1. Soft broad shadow
-    draw_text_spaced(draw, (707*SCALE + 5, 520*SCALE + 5), name_upper, font_name, spacing_val, "#00000011")
+    draw_text_spaced(draw, (707*SCALE + 5*SCALE, 520*SCALE + 5*SCALE), name_upper, font_name, spacing_val, "#00000011")
     # 2. Tight gold accent
-    draw_text_spaced(draw, (707*SCALE + 2, 520*SCALE + 2), name_upper, font_name, spacing_val, "#C5A028")
+    draw_text_spaced(draw, (707*SCALE + 2*SCALE, 520*SCALE + 2*SCALE), name_upper, font_name, spacing_val, "#C5A028")
     # 3. Main Luxury Text with Sharp Stroke
     draw_text_spaced(draw, (707*SCALE, 520*SCALE), name_upper, font_name, spacing_val, "#000B1D", stroke_width=int(1*SCALE), stroke_fill="#000B1D")
 
@@ -427,7 +445,7 @@ def generate_and_send_certificate(result):
             sig_img = sharpness_enhancer.enhance(2.5)  # Crisper edges
             
             sx = int(300*SCALE - (sig_img.width // 2))
-            # Move further downward (baseline shifted to 1080)
+            # Move to the absolute bottom, almost touching the border line
             sy = int(1080*SCALE - sig_img.height)
             img.paste(sig_img, (sx, sy), sig_img)
         except Exception:

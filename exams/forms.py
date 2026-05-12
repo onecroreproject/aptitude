@@ -282,6 +282,26 @@ class StudentProfileForm(forms.ModelForm):
         }
 
 
+class AdminProfileForm(forms.ModelForm):
+    """
+    Profile update form for Admin and Sub-Admin.
+    """
+
+    class Meta:
+        model = CustomUser
+        fields = [
+            'first_name', 'last_name', 'email', 'phone_number', 
+            'profile_photo'
+        ]
+        widgets = {
+            'first_name': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'First Name'}),
+            'last_name': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Last Name'}),
+            'email': forms.EmailInput(attrs={'class': 'form-input', 'placeholder': 'Email'}),
+            'phone_number': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Phone Number'}),
+            'profile_photo': forms.FileInput(attrs={'class': 'form-input'}),
+        }
+
+
 # ──────────────────────────────────────────────
 # CATEGORY FORM (ADMIN DASHBOARD)
 # ──────────────────────────────────────────────

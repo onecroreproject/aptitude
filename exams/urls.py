@@ -34,6 +34,7 @@ urlpatterns = [
     path('notifications/mark-all-read/', views.MarkAllNotificationsReadView.as_view(), name='mark_all_read'),
 
     # ── Admin Dashboard ──────────────────────────
+    path('admin-panel/profile/', views.AdminProfileView.as_view(), name='admin_profile'),
     path('admin-panel/', views.AdminDashboardView.as_view(), name='admin_dashboard'),
     path('admin-panel/categories/', views.AdminCategoriesView.as_view(), name='admin_categories'),
     path('admin-panel/categories/add/', views.AdminAddCategoryView.as_view(), name='admin_add_category'),
@@ -71,6 +72,7 @@ urlpatterns = [
     path('preview-certificate/', views.PreviewCertificateView.as_view(), name='preview_certificate'),
 
     # ── Sub-Admin Management (Superuser Only) ──
+    path('subadmin/profile/', views.SubAdminProfileView.as_view(), name='subadmin_profile'),
     path('admin-panel/subadmins/', views.AdminSubAdminsView.as_view(), name='admin_subadmins'),
     path('admin-panel/subadmins/add/', views.AdminAddSubAdminView.as_view(), name='admin_add_subadmin'),
     path('admin-panel/subadmins/<int:pk>/edit/', views.AdminEditSubAdminView.as_view(), name='admin_edit_subadmin'),

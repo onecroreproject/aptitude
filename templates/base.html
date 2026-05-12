@@ -54,6 +54,8 @@
         <a href="{% url 'admin_subadmins' %}"
           class="nav-link {% if 'subadmin' in request.resolver_match.url_name %}active{% endif %}">🛡️ Sub Admins</a>
         {% endif %}
+        <a href="{% if user.is_superuser %}{% url 'admin_profile' %}{% else %}{% url 'subadmin_profile' %}{% endif %}"
+          class="nav-link {% if 'profile' in request.resolver_match.url_name %}active{% endif %}">👤 My Profile</a>
         {% else %}
         <a href="{% url 'student_dashboard' %}"
           class="nav-link {% if request.resolver_match.url_name == 'student_dashboard' %}active{% endif %}">🏠
@@ -122,7 +124,7 @@
 
               <!-- Dropdown Menu -->
               <div class="user-dropdown" id="userDropdown">
-                <a href="{% if user.is_superuser %}/admin/{% else %}{% url 'student_profile' %}{% endif %}" class="dropdown-item">👤 View Profile</a>
+                <a href="{% if user.is_superuser %}{% url 'admin_profile' %}{% elif user.role == 'Sub Admin' %}{% url 'subadmin_profile' %}{% else %}{% url 'student_profile' %}{% endif %}" class="dropdown-item">👤 View Profile</a>
                 <a href="{% url 'logout' %}" class="dropdown-item" style="color: var(--accent-danger); border-top: 1px solid var(--border-color);">🚪 Logout Session</a>
               </div>
             </div>
