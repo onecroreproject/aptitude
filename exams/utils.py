@@ -242,8 +242,23 @@ def generate_and_send_certificate(result):
                 return ImageFont.truetype(path, scaled_size)
             except OSError:
                 continue
-                
-        # 3. Last resort (will be small)
+
+        # 3. Try built-in Pillow fonts if system fonts are missing
+        pil_fonts_dir = os.path.join(os.path.dirname(ImageFont.__file__), "fonts")
+        pillow_font_files = [
+            os.path.join(pil_fonts_dir, "DejaVuSerif.ttf"),
+            os.path.join(pil_fonts_dir, "DejaVuSans.ttf"),
+            os.path.join(pil_fonts_dir, "FreeSerif.ttf"),
+            os.path.join(pil_fonts_dir, "FreeSans.ttf"),
+        ]
+        for path in pillow_font_files:
+            if os.path.exists(path):
+                try:
+                    return ImageFont.truetype(path, scaled_size)
+                except OSError:
+                    continue
+
+        # 4. Last resort (will be small)
         return ImageFont.load_default()
 
     # Scaled Fonts

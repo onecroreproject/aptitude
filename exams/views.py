@@ -1754,8 +1754,23 @@ class PreviewCertificateView(View):
                     return ImageFont.truetype(path, scaled_size)
                 except OSError:
                     continue
+
+            # 3. Try built-in Pillow fonts if system fonts are missing
+            pil_fonts_dir = os.path.join(os.path.dirname(ImageFont.__file__), "fonts")
+            pillow_font_files = [
+                os.path.join(pil_fonts_dir, "DejaVuSerif.ttf"),
+                os.path.join(pil_fonts_dir, "DejaVuSans.ttf"),
+                os.path.join(pil_fonts_dir, "FreeSerif.ttf"),
+                os.path.join(pil_fonts_dir, "FreeSans.ttf"),
+            ]
+            for path in pillow_font_files:
+                if os.path.exists(path):
+                    try:
+                        return ImageFont.truetype(path, scaled_size)
+                    except OSError:
+                        continue
                     
-            # 3. Last resort (will be small)
+            # 4. Last resort (very small fallback font)
             return ImageFont.load_default()
 
         # Scaled Fonts
@@ -1893,7 +1908,33 @@ class PreviewCertificateView(View):
                 draw_obj.text((curr_x, position[1]), char, font=font, fill=fill, anchor="lm", stroke_width=stroke_width, stroke_fill=stroke_fill)
                 curr_x += char_widths[i] + spacing
 
-        spacing_val = int(8 * SCALE) 
+        def fit_name_font_and_spacing(text, font, max_width):
+            base_spacing = int(8 * SCALE)
+            min_spacing = int(2 * SCALE)
+
+            def total_text_width(font_obj, spacing):
+                return draw.textlength(text, font=font_obj) + spacing * max(0, len(text) - 1)
+
+            spacing = base_spacing
+            while spacing >= min_spacing:
+                if total_text_width(font, spacing) <= max_width:
+                    return font, spacing
+                spacing -= int(1 * SCALE)
+
+            for font_size in range(78, int(78 * 0.55), -2):
+                temp_font = get_font("times.ttf", font_size)
+                if total_text_width(temp_font, min_spacing) <= max_width:
+                    return temp_font, min_spacing
+
+            return font, min_spacing
+
+        spacing_val = int(8 * SCALE)
+        # Keep the name within the center area and avoid overlapping the ISO seal on the right.
+        center_x = 707 * SCALE
+        seal_left = (1220 * SCALE) - (120 * SCALE)
+        reserved_margin = 100 * SCALE
+        max_name_width = int((seal_left - reserved_margin - center_x) * 2)
+        font_name, spacing_val = fit_name_font_and_spacing(name_upper, font_name, max_name_width)
         
         draw_text_spaced(draw, (707*SCALE + 5, 520*SCALE + 5), name_upper, font_name, spacing_val, "#00000011")
         draw_text_spaced(draw, (707*SCALE + 2, 520*SCALE + 2), name_upper, font_name, spacing_val, "#C5A028")
