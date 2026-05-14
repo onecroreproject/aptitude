@@ -1730,47 +1730,96 @@ class PreviewCertificateView(View):
         img = Image.new("RGB", (WIDTH, HEIGHT), color="#FFFFFF")
         draw = ImageDraw.Draw(img)
 
+        def find_font_file(font_name):
+            if os.path.isabs(font_name) and os.path.exists(font_name):
+                return font_name
+
+            base_candidates = [
+                os.path.join(str(settings.BASE_DIR), "static", "fonts", font_name),
+                os.path.join(str(settings.BASE_DIR), "static", "images", font_name),
+                os.path.join(str(settings.STATIC_ROOT), "fonts", font_name) if getattr(settings, "STATIC_ROOT", None) else None,
+                os.path.join(str(settings.STATIC_ROOT), "images", font_name) if getattr(settings, "STATIC_ROOT", None) else None,
+            ]
+            base_candidates = [p for p in base_candidates if p]
+
+            for candidate in base_candidates:
+                if os.path.exists(candidate):
+                    return candidate
+
+            system_dirs = [
+                os.path.join("C:", "Windows", "Fonts"),
+                os.path.join("/usr", "share", "fonts"),
+                os.path.join("/usr", "local", "share", "fonts"),
+                os.path.expanduser("~/.fonts"),
+                os.path.join("/Library", "Fonts"),
+                os.path.join("/System", "Library", "Fonts"),
+            ]
+            candidate_names = [font_name]
+            lower = font_name.lower()
+            if "times" in lower or "serif" in lower:
+                candidate_names.extend([
+                    "Times New Roman.ttf",
+                    "Times.ttf",
+                    "DejaVuSerif.ttf",
+                    "DejaVuSerif-Bold.ttf",
+                    "LiberationSerif-Regular.ttf",
+                    "FreeSerif.ttf",
+                ])
+            elif "arial" in lower or "sans" in lower:
+                candidate_names.extend([
+                    "Arial.ttf",
+                    "DejaVuSans.ttf",
+                    "DejaVuSans-Bold.ttf",
+                    "LiberationSans-Regular.ttf",
+                    "LiberationSans-Bold.ttf",
+                    "FreeSans.ttf",
+                ])
+            else:
+                candidate_names.extend([
+                    "DejaVuSans.ttf",
+                    "DejaVuSerif.ttf",
+                    "LiberationSans-Regular.ttf",
+                    "LiberationSerif-Regular.ttf",
+                    "FreeSans.ttf",
+                    "FreeSerif.ttf",
+                ])
+
+            for dir_path in system_dirs:
+                if not dir_path or not os.path.exists(dir_path):
+                    continue
+                for candidate in candidate_names:
+                    candidate_path = os.path.join(dir_path, candidate)
+                    if os.path.exists(candidate_path):
+                        return candidate_path
+
+            return None
+
         def get_font(font_name, size):
             scaled_size = int(size * SCALE)
-            # Potential font paths on Linux
-            linux_font_paths = [
-                "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf",
-                "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-                "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-                "/usr/share/fonts/truetype/freefont/FreeSerif.ttf",
-                "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+            font_path = find_font_file(font_name)
+            if font_path:
+                try:
+                    return ImageFont.truetype(font_path, scaled_size)
+                except OSError:
+                    pass
+
+            fallback_fonts = [
+                "DejaVuSerif.ttf",
+                "DejaVuSans.ttf",
+                "LiberationSerif-Regular.ttf",
+                "LiberationSans-Regular.ttf",
+                "Arial.ttf",
+                "Times.ttf",
+                "FreeSerif.ttf",
+                "FreeSans.ttf",
             ]
-            
-            # 1. Try requested font
-            try:
-                return ImageFont.truetype(font_name, scaled_size)
-            except OSError:
-                pass
-                
-            # 2. Try common system fonts
-            for path in ["arial.ttf", "times.ttf", "Arial.ttf", "Times.ttf"] + linux_font_paths:
+
+            for path in fallback_fonts:
                 try:
                     return ImageFont.truetype(path, scaled_size)
                 except OSError:
                     continue
 
-            # 3. Try built-in Pillow fonts if system fonts are missing
-            pil_fonts_dir = os.path.join(os.path.dirname(ImageFont.__file__), "fonts")
-            pillow_font_files = [
-                os.path.join(pil_fonts_dir, "DejaVuSerif.ttf"),
-                os.path.join(pil_fonts_dir, "DejaVuSans.ttf"),
-                os.path.join(pil_fonts_dir, "FreeSerif.ttf"),
-                os.path.join(pil_fonts_dir, "FreeSans.ttf"),
-            ]
-            for path in pillow_font_files:
-                if os.path.exists(path):
-                    try:
-                        return ImageFont.truetype(path, scaled_size)
-                    except OSError:
-                        continue
-                    
-            # 4. Last resort (very small fallback font)
             return ImageFont.load_default()
 
         def get_resampling_filter():
