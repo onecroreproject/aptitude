@@ -220,17 +220,6 @@ def generate_and_send_certificate(result):
 
     def get_font(font_name, size):
         scaled_size = int(size * SCALE)
-        
-        # Bundled fonts directory (works on any server)
-        bundled_fonts_dir = os.path.join(settings.BASE_DIR, 'static', 'fonts')
-        
-        # Map requested font names to bundled Liberation equivalents
-        # Liberation Sans = Arial replacement, Liberation Serif = Times replacement
-        bundled_map = {
-            'arial': ['LiberationSans-Regular.ttf', 'LiberationSans-Bold.ttf'],
-            'times': ['LiberationSerif-Regular.ttf', 'LiberationSerif-Bold.ttf'],
-        }
-        
         # Potential font paths on Linux
         linux_font_paths = [
             "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf",
@@ -241,47 +230,20 @@ def generate_and_send_certificate(result):
             "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
         ]
         
-        # 1. Try requested font (works on Windows with system fonts)
+        # 1. Try requested font
         try:
             return ImageFont.truetype(font_name, scaled_size)
         except OSError:
             pass
-        
-        # 2. Try bundled Liberation fonts (works on any server)
-        font_key = font_name.lower().replace('.ttf', '')
-        if font_key in bundled_map:
-            for bundled_name in bundled_map[font_key]:
-                bundled_path = os.path.join(bundled_fonts_dir, bundled_name)
-                try:
-                    return ImageFont.truetype(bundled_path, scaled_size)
-                except OSError:
-                    continue
-        # Also try all bundled fonts as fallback
-        if os.path.isdir(bundled_fonts_dir):
-            for fname in sorted(os.listdir(bundled_fonts_dir)):
-                if fname.endswith('.ttf'):
-                    try:
-                        return ImageFont.truetype(os.path.join(bundled_fonts_dir, fname), scaled_size)
-                    except OSError:
-                        continue
             
-        # 3. Try common system fonts
+        # 2. Try common system fonts
         for path in ["arial.ttf", "times.ttf", "Arial.ttf", "Times.ttf"] + linux_font_paths:
             try:
                 return ImageFont.truetype(path, scaled_size)
             except OSError:
                 continue
-        
-        # 4. Try fc-match on Linux as a last resort before default
-        try:
-            import subprocess
-            result = subprocess.run(['fc-match', '-f', '%{file}', 'sans'], capture_output=True, text=True, timeout=5)
-            if result.returncode == 0 and result.stdout.strip():
-                return ImageFont.truetype(result.stdout.strip(), scaled_size)
-        except Exception:
-            pass
                 
-        # 5. Last resort (will be small)
+        # 3. Last resort (will be small)
         return ImageFont.load_default()
 
     # Scaled Fonts
@@ -413,7 +375,31 @@ def generate_and_send_certificate(result):
             draw_obj.text((curr_x, position[1]), char, font=font, fill=fill, anchor="lm", stroke_width=stroke_width, stroke_fill=stroke_fill)
             curr_x += char_widths[i] + spacing
 
+    def fit_name_font_and_spacing(text, font, max_width):
+        base_spacing = int(8 * SCALE)
+        min_spacing = int(2 * SCALE)
+
+        def total_text_width(font_obj, spacing):
+            return draw.textlength(text, font=font_obj) + spacing * max(0, len(text) - 1)
+
+        # First try reducing letter spacing while keeping the same font size.
+        spacing = base_spacing
+        while spacing >= min_spacing:
+            if total_text_width(font, spacing) <= max_width:
+                return font, spacing
+            spacing -= int(1 * SCALE)
+
+        # If still too wide, reduce font size until it fits.
+        for font_size in range(78, int(78 * 0.55), -2):
+            temp_font = get_font("times.ttf", font_size)
+            if total_text_width(temp_font, min_spacing) <= max_width:
+                return temp_font, min_spacing
+
+        return font, min_spacing
+
     spacing_val = int(8 * SCALE) # Elegant spacing
+    max_name_width = 1000 * SCALE
+    font_name, spacing_val = fit_name_font_and_spacing(name_upper, font_name, max_name_width)
     
     # Draw Depth Layers
     # 1. Soft broad shadow
