@@ -1732,6 +1732,17 @@ class PreviewCertificateView(View):
 
         def get_font(font_name, size):
             scaled_size = int(size * SCALE)
+            
+            # Bundled fonts directory (works on any server)
+            bundled_fonts_dir = os.path.join(settings.BASE_DIR, 'static', 'fonts')
+            
+            # Map requested font names to bundled Liberation equivalents
+            # Liberation Sans = Arial replacement, Liberation Serif = Times replacement
+            bundled_map = {
+                'arial': ['LiberationSans-Regular.ttf', 'LiberationSans-Bold.ttf'],
+                'times': ['LiberationSerif-Regular.ttf', 'LiberationSerif-Bold.ttf'],
+            }
+            
             # Potential font paths on Linux
             linux_font_paths = [
                 "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf",
@@ -1742,20 +1753,47 @@ class PreviewCertificateView(View):
                 "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
             ]
             
-            # 1. Try requested font
+            # 1. Try requested font (works on Windows with system fonts)
             try:
                 return ImageFont.truetype(font_name, scaled_size)
             except OSError:
                 pass
+            
+            # 2. Try bundled Liberation fonts (works on any server)
+            font_key = font_name.lower().replace('.ttf', '')
+            if font_key in bundled_map:
+                for bundled_name in bundled_map[font_key]:
+                    bundled_path = os.path.join(bundled_fonts_dir, bundled_name)
+                    try:
+                        return ImageFont.truetype(bundled_path, scaled_size)
+                    except OSError:
+                        continue
+            # Also try all bundled fonts as fallback
+            if os.path.isdir(bundled_fonts_dir):
+                for fname in sorted(os.listdir(bundled_fonts_dir)):
+                    if fname.endswith('.ttf'):
+                        try:
+                            return ImageFont.truetype(os.path.join(bundled_fonts_dir, fname), scaled_size)
+                        except OSError:
+                            continue
                 
-            # 2. Try common system fonts
+            # 3. Try common system fonts
             for path in ["arial.ttf", "times.ttf", "Arial.ttf", "Times.ttf"] + linux_font_paths:
                 try:
                     return ImageFont.truetype(path, scaled_size)
                 except OSError:
                     continue
+            
+            # 4. Try fc-match on Linux as a last resort before default
+            try:
+                import subprocess
+                result = subprocess.run(['fc-match', '-f', '%{file}', 'sans'], capture_output=True, text=True, timeout=5)
+                if result.returncode == 0 and result.stdout.strip():
+                    return ImageFont.truetype(result.stdout.strip(), scaled_size)
+            except Exception:
+                pass
                     
-            # 3. Last resort (will be small)
+            # 5. Last resort (will be small)
             return ImageFont.load_default()
 
         # Scaled Fonts
