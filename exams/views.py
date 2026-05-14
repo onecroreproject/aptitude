@@ -1773,6 +1773,43 @@ class PreviewCertificateView(View):
             # 4. Last resort (very small fallback font)
             return ImageFont.load_default()
 
+        def get_resampling_filter():
+            if hasattr(Image, "Resampling"):
+                return Image.Resampling.LANCZOS
+            if hasattr(Image, "LANCZOS"):
+                return Image.LANCZOS
+            if hasattr(Image, "ANTIALIAS"):
+                return Image.ANTIALIAS
+            return Image.BICUBIC
+
+        def text_width(text, font_obj):
+            if hasattr(draw, "textlength"):
+                try:
+                    return draw.textlength(text, font=font_obj)
+                except Exception:
+                    pass
+            if hasattr(draw, "textbbox"):
+                bbox = draw.textbbox((0, 0), text, font=font_obj)
+                return bbox[2] - bbox[0]
+            if hasattr(font_obj, "getsize"):
+                return font_obj.getsize(text)[0]
+            return len(text) * getattr(font_obj, "size", 10)
+
+        def resolve_asset_path(filename):
+            candidate_dirs = [
+                os.path.join(str(settings.BASE_DIR), 'static', 'images'),
+            ]
+            if getattr(settings, 'STATIC_ROOT', None):
+                candidate_dirs.append(os.path.join(str(settings.STATIC_ROOT), 'images'))
+            candidate_dirs = [d for d in candidate_dirs if d]
+            for directory in candidate_dirs:
+                candidate = os.path.join(directory, filename)
+                if os.path.exists(candidate):
+                    return candidate
+            return None
+
+        resample_filter = get_resampling_filter()
+
         # Scaled Fonts
         font_cert = get_font("times.ttf", 85)
         font_sub = get_font("arial.ttf", 32)
@@ -1820,15 +1857,27 @@ class PreviewCertificateView(View):
         draw.polygon(r2, fill="#C5A028")
 
         # Path Definitions for Assets
-        logo_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'dlklogo.png')
-        if not os.path.exists(logo_path):
-            logo_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'dlklogo.jpg')
-        if not os.path.exists(logo_path):
-            logo_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'Logo.png')
-            
-        skill_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'Skill India.png')
-        iso_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'Seal Image.png')
-        sig_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'Signature.png')
+        def resolve_asset_path(filename):
+            candidates = [
+                os.path.join(settings.BASE_DIR, 'static', 'images', filename),
+                os.path.join(settings.BASE_DIR, 'staticfiles', 'images', filename),
+            ]
+            if getattr(settings, 'STATIC_ROOT', None):
+                candidates.append(os.path.join(settings.STATIC_ROOT, 'images', filename))
+            for candidate in candidates:
+                if os.path.exists(candidate):
+                    return candidate
+            return None
+
+        logo_path = resolve_asset_path('dlklogo.png')
+        if not logo_path:
+            logo_path = resolve_asset_path('dlklogo.jpg')
+        if not logo_path:
+            logo_path = resolve_asset_path('Logo.png')
+
+        skill_path = resolve_asset_path('Skill India.png')
+        iso_path = resolve_asset_path('Seal Image.png')
+        sig_path = resolve_asset_path('Signature.png')
 
         # 3. Enhanced Design Elements
         # (Watermark removed for cleaner style)
@@ -1848,7 +1897,7 @@ class PreviewCertificateView(View):
                 logo = vibrancy
                 
                 # 2. Adjusted size for better balance
-                logo.thumbnail((int(650*SCALE), int(300*SCALE)), Image.Resampling.LANCZOS)
+                logo.thumbnail((int(650*SCALE), int(300*SCALE)), resample_filter)
                 
                 lx = int(20*SCALE)
                 ly = int(40*SCALE)
@@ -1871,7 +1920,7 @@ class PreviewCertificateView(View):
             try:
                 skill_img = Image.open(skill_path).convert("RGBA")
                 # Increase size
-                skill_img.thumbnail((int(400*SCALE), int(200*SCALE)), Image.Resampling.LANCZOS)
+                skill_img.thumbnail((int(400*SCALE), int(200*SCALE)), resample_filter)
                 sx = int(WIDTH - skill_img.width - 40*SCALE) # Match left margin
                 sy = int(40*SCALE)
                 img.paste(skill_img, (sx, sy), skill_img)
@@ -1898,7 +1947,7 @@ class PreviewCertificateView(View):
             total_width = 0
             char_widths = []
             for char in text:
-                cw = draw_obj.textlength(char, font=font)
+                cw = text_width(char, font)
                 char_widths.append(cw)
                 total_width += cw + (spacing if char != text[-1] else 0)
             
@@ -1913,7 +1962,7 @@ class PreviewCertificateView(View):
             min_spacing = int(2 * SCALE)
 
             def total_text_width(font_obj, spacing):
-                return draw.textlength(text, font=font_obj) + spacing * max(0, len(text) - 1)
+                return text_width(text, font_obj) + spacing * max(0, len(text) - 1)
 
             spacing = base_spacing
             while spacing >= min_spacing:
@@ -1982,7 +2031,7 @@ class PreviewCertificateView(View):
                 from PIL import ImageEnhance
                 sig_img = Image.open(sig_path).convert("RGBA")
                 # Increase size further
-                sig_img.thumbnail((int(750*SCALE), int(350*SCALE)), Image.Resampling.LANCZOS)
+                sig_img.thumbnail((int(750*SCALE), int(350*SCALE)), resample_filter)
                 
                 # Make it significantly darker, bolder and more visible (Ink effect)
                 contrast_enhancer = ImageEnhance.Contrast(sig_img)
@@ -2039,7 +2088,7 @@ class PreviewCertificateView(View):
                 # 3. Resize to fit perfectly inside the yellow circle without overflowing
                 # Using 2.8x multiplier to ensure the seal stays within the gold circle boundaries
                 iso_final_size = int(seal_radius * 2.8)
-                iso_img_final = square_iso.resize((iso_final_size, iso_final_size), Image.Resampling.LANCZOS)
+                iso_img_final = square_iso.resize((iso_final_size, iso_final_size), resample_filter)
                 
                 # 4. Perfect Centering with corrective nudge (adjusted for perceived center and user feedback)
                 # Compensation for asset asymmetry and custom positioning
