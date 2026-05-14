@@ -178,6 +178,7 @@ def submit_and_evaluate(result):
     return result
 
 
+
 def generate_and_send_certificate(result):
     """
     Generate the certificate using Pillow in A4 Landscape style and send via email.
@@ -189,29 +190,13 @@ def generate_and_send_certificate(result):
     from django.core.mail import EmailMessage
     from django.utils import timezone
 
-    from .models import Certificate
-    
     student = result.student
     student_name = f"{student.first_name} {student.last_name}".strip() or student.username
-    category = result.exam_paper.category
-    course_name = category.name if category else "Aptitude Course"
+    course_name = result.exam_paper.category.name if result.exam_paper and result.exam_paper.category else "Aptitude Course"
     score = float(result.percentage())
     date_str = timezone.now().strftime("%B %Y")
 
-    # 1. Update or Create Certificate record
-    # Enforces "One student + One course/category = Only ONE certificate record"
-    certificate, created = Certificate.objects.update_or_create(
-        student=student,
-        category=category,
-        defaults={
-            'marks': result.total_marks_obtained,
-            'percentage': result.percentage(),
-            'total_marks': result.total_marks_possible,
-            'exam_date': result.completed_at or timezone.now(),
-        }
-    )
-
-    # 2. Scale & Resolution (300 DPI: 3508 x 2480)
+    # 1. Scale & Resolution (300 DPI: 3508 x 2480)
     WIDTH, HEIGHT = 3508, 2480
     SCALE = WIDTH / 1414.0 # Base scale relative to 1414 width
     
@@ -220,46 +205,13 @@ def generate_and_send_certificate(result):
 
     def get_font(font_name, size):
         scaled_size = int(size * SCALE)
-        # Potential font paths on Linux
-        linux_font_paths = [
-            "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf",
-            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            "/usr/share/fonts/truetype/freefont/FreeSerif.ttf",
-            "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
-        ]
-        
-        # 1. Try requested font
         try:
             return ImageFont.truetype(font_name, scaled_size)
         except OSError:
-            pass
-            
-        # 2. Try common system fonts
-        for path in ["arial.ttf", "times.ttf", "Arial.ttf", "Times.ttf"] + linux_font_paths:
             try:
-                return ImageFont.truetype(path, scaled_size)
+                return ImageFont.truetype("arial.ttf", scaled_size)
             except OSError:
-                continue
-
-        # 3. Try built-in Pillow fonts if system fonts are missing
-        pil_fonts_dir = os.path.join(os.path.dirname(ImageFont.__file__), "fonts")
-        pillow_font_files = [
-            os.path.join(pil_fonts_dir, "DejaVuSerif.ttf"),
-            os.path.join(pil_fonts_dir, "DejaVuSans.ttf"),
-            os.path.join(pil_fonts_dir, "FreeSerif.ttf"),
-            os.path.join(pil_fonts_dir, "FreeSans.ttf"),
-        ]
-        for path in pillow_font_files:
-            if os.path.exists(path):
-                try:
-                    return ImageFont.truetype(path, scaled_size)
-                except OSError:
-                    continue
-
-        # 4. Last resort (will be small)
-        return ImageFont.load_default()
+                return ImageFont.load_default()
 
     # Scaled Fonts
     font_cert = get_font("times.ttf", 85)
@@ -326,14 +278,14 @@ def generate_and_send_certificate(result):
             vibrancy = ImageEnhance.Color(sharpness).enhance(1.6) # +60% Saturation (Green focus)
             logo = vibrancy
             
-            # 2. Adjusted size for better balance
-            logo.thumbnail((int(650*SCALE), int(300*SCALE)), Image.Resampling.LANCZOS)
+            # 2. Increase size slightly (maintained from previous step)
+            logo.thumbnail((int(900*SCALE), int(300*SCALE)), Image.Resampling.LANCZOS)
             
             lx = int(20*SCALE)
-            ly = int(40*SCALE)
+            ly = int(20*SCALE)
             
             # 3. Premium Soft White Glow effect
-            glow_size = int(10 * SCALE)
+            glow_size = int(8 * SCALE)
             glow = Image.new("RGBA", (logo.width + glow_size*2, logo.height + glow_size*2), (0, 0, 0, 0))
             # Paste a soft white silhouette for glow
             glow_mask = logo.split()[3]
@@ -360,7 +312,7 @@ def generate_and_send_certificate(result):
 
     # 5. Main Text Content
     # "CERTIFICATE" (with deep shadow)
-    draw.text((707*SCALE + 3*SCALE, 120*SCALE + 3*SCALE), "CERTIFICATE", font=font_cert, fill="#00000044", anchor="mm")
+    draw.text((707*SCALE + 3, 120*SCALE + 3), "CERTIFICATE", font=font_cert, fill="#00000044", anchor="mm")
     draw.text((707*SCALE, 120*SCALE), "CERTIFICATE", font=font_cert, fill="#C5A028", anchor="mm") # Gold Title
     
     # "OF ACHIEVEMENT" Pill
@@ -390,37 +342,13 @@ def generate_and_send_certificate(result):
             draw_obj.text((curr_x, position[1]), char, font=font, fill=fill, anchor="lm", stroke_width=stroke_width, stroke_fill=stroke_fill)
             curr_x += char_widths[i] + spacing
 
-    def fit_name_font_and_spacing(text, font, max_width):
-        base_spacing = int(8 * SCALE)
-        min_spacing = int(2 * SCALE)
-
-        def total_text_width(font_obj, spacing):
-            return draw.textlength(text, font=font_obj) + spacing * max(0, len(text) - 1)
-
-        # First try reducing letter spacing while keeping the same font size.
-        spacing = base_spacing
-        while spacing >= min_spacing:
-            if total_text_width(font, spacing) <= max_width:
-                return font, spacing
-            spacing -= int(1 * SCALE)
-
-        # If still too wide, reduce font size until it fits.
-        for font_size in range(78, int(78 * 0.55), -2):
-            temp_font = get_font("times.ttf", font_size)
-            if total_text_width(temp_font, min_spacing) <= max_width:
-                return temp_font, min_spacing
-
-        return font, min_spacing
-
     spacing_val = int(8 * SCALE) # Elegant spacing
-    max_name_width = 1000 * SCALE
-    font_name, spacing_val = fit_name_font_and_spacing(name_upper, font_name, max_name_width)
     
     # Draw Depth Layers
     # 1. Soft broad shadow
-    draw_text_spaced(draw, (707*SCALE + 5*SCALE, 520*SCALE + 5*SCALE), name_upper, font_name, spacing_val, "#00000011")
+    draw_text_spaced(draw, (707*SCALE + 5, 520*SCALE + 5), name_upper, font_name, spacing_val, "#00000011")
     # 2. Tight gold accent
-    draw_text_spaced(draw, (707*SCALE + 2*SCALE, 520*SCALE + 2*SCALE), name_upper, font_name, spacing_val, "#C5A028")
+    draw_text_spaced(draw, (707*SCALE + 2, 520*SCALE + 2), name_upper, font_name, spacing_val, "#C5A028")
     # 3. Main Luxury Text with Sharp Stroke
     draw_text_spaced(draw, (707*SCALE, 520*SCALE), name_upper, font_name, spacing_val, "#000B1D", stroke_width=int(1*SCALE), stroke_fill="#000B1D")
 
@@ -484,7 +412,7 @@ def generate_and_send_certificate(result):
             sig_img = sharpness_enhancer.enhance(2.5)  # Crisper edges
             
             sx = int(300*SCALE - (sig_img.width // 2))
-            # Move to the absolute bottom, almost touching the border line
+            # Move further downward (baseline shifted to 1080)
             sy = int(1080*SCALE - sig_img.height)
             img.paste(sig_img, (sx, sy), sig_img)
         except Exception:
@@ -566,5 +494,3 @@ Aptipro Exam Team"""
     )
     email_msg.attach_file(cert_path)
     email_msg.send(fail_silently=False)
-
-
