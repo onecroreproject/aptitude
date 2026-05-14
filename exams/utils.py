@@ -228,16 +228,26 @@ def generate_and_send_certificate(result):
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
             "/usr/share/fonts/truetype/freefont/FreeSerif.ttf",
             "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+            "/usr/share/fonts/fonts-dejavu/DejaVuSerif.ttf",
+            "/usr/share/fonts/fonts-dejavu/DejaVuSans.ttf",
         ]
         
-        # 1. Try requested font
+        # 1. Try requested font (in current dir or system path)
         try:
             return ImageFont.truetype(font_name, scaled_size)
         except OSError:
             pass
             
-        # 2. Try common system fonts
-        for path in ["arial.ttf", "times.ttf", "Arial.ttf", "Times.ttf"] + linux_font_paths:
+        # 2. Try common system fonts and project static fonts if they exist
+        search_fonts = ["arial.ttf", "times.ttf", "Arial.ttf", "Times.ttf"]
+        # Add project-specific font paths
+        project_font_dir = os.path.join(settings.BASE_DIR, 'static', 'fonts')
+        if os.path.exists(project_font_dir):
+            for f in os.listdir(project_font_dir):
+                if f.endswith('.ttf'):
+                    search_fonts.append(os.path.join(project_font_dir, f))
+
+        for path in search_fonts + linux_font_paths:
             try:
                 return ImageFont.truetype(path, scaled_size)
             except OSError:
@@ -284,15 +294,21 @@ def generate_and_send_certificate(result):
     draw.polygon(top_points, fill="#001F3F")
 
     # Path Definitions for Assets
-    logo_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'dlklogo.png')
-    if not os.path.exists(logo_path):
-        logo_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'dlklogo.jpg')
-    if not os.path.exists(logo_path):
-        logo_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'Logo.png')
-        
-    skill_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'Skill India.png')
-    iso_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'Seal Image.png')
-    sig_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'Signature.png')
+    # Path Definitions for Assets (Search in both static and staticfiles for production)
+    def get_asset_path(filename):
+        paths = [
+            os.path.join(settings.BASE_DIR, 'static', 'images', filename),
+            os.path.join(settings.BASE_DIR, 'staticfiles', 'images', filename),
+        ]
+        for p in paths:
+            if os.path.exists(p):
+                return p
+        return None
+
+    logo_path = get_asset_path('dlklogo.png') or get_asset_path('dlklogo.jpg') or get_asset_path('Logo.png')
+    skill_path = get_asset_path('Skill India.png')
+    iso_path = get_asset_path('Seal Image.png')
+    sig_path = get_asset_path('Signature.png')
 
     # 3. Enhanced Design Elements
     # (Watermark removed for cleaner style)
@@ -445,8 +461,8 @@ def generate_and_send_certificate(result):
             sig_img = sharpness_enhancer.enhance(2.5)  # Crisper edges
             
             sx = int(300*SCALE - (sig_img.width // 2))
-            # Move to the absolute bottom, almost touching the border line
-            sy = int(1080*SCALE - sig_img.height)
+            # Move to overlap the signature line (at 920*SCALE)
+            sy = int(920*SCALE - sig_img.height + 20*SCALE) 
             img.paste(sig_img, (sx, sy), sig_img)
         except Exception:
             pass
@@ -462,12 +478,20 @@ def generate_and_send_certificate(result):
     if os.path.exists(iso_path):
         try:
             # Draw professional ribbon with notched bottom
-            ribbon_pts = [(1140*SCALE, 300*SCALE), (1300*SCALE, 300*SCALE), (1300*SCALE, 600*SCALE), (1220*SCALE, 550*SCALE), (1140*SCALE, 600*SCALE)]
+            # Centered over the Date section (1114*SCALE) for symmetry with signature
+            seal_x_base = 1114*SCALE
+            ribbon_pts = [
+                (seal_x_base - 80*SCALE, 300*SCALE), 
+                (seal_x_base + 80*SCALE, 300*SCALE), 
+                (seal_x_base + 80*SCALE, 600*SCALE), 
+                (seal_x_base, 550*SCALE), 
+                (seal_x_base - 80*SCALE, 600*SCALE)
+            ]
             draw.polygon(ribbon_pts, fill="#000B1D") # Deeper Navy
             draw.polygon(ribbon_pts, outline="#C5A028", width=int(2*SCALE))
             
             # Draw the "Yellow Circular Badge" base
-            seal_center = (1220*SCALE, 420*SCALE)
+            seal_center = (seal_x_base, 420*SCALE)
             seal_radius = 120*SCALE
             # Outer gold circle
             draw.ellipse([(seal_center[0]-seal_radius, seal_center[1]-seal_radius), (seal_center[0]+seal_radius, seal_center[1]+seal_radius)], fill="#C5A028", outline="#8B7500", width=int(3*SCALE))
@@ -486,17 +510,13 @@ def generate_and_send_certificate(result):
             square_iso = Image.new("RGBA", (sq_size, sq_size), (0, 0, 0, 0))
             square_iso.paste(iso_img, ((sq_size - w) // 2, (sq_size - h) // 2))
             
-            # 3. Resize to fit perfectly inside the yellow circle without overflowing
-            # Using 2.8x multiplier to ensure the seal stays within the gold circle boundaries
+            # 3. Resize to fit perfectly inside the yellow circle
             iso_final_size = int(seal_radius * 2.8)
             iso_img_final = square_iso.resize((iso_final_size, iso_final_size), Image.Resampling.LANCZOS)
             
-            # 4. Perfect Centering with corrective nudge (adjusted for perceived center and user feedback)
-            # Compensation for asset asymmetry and custom positioning
-            nudge_x = 36 * SCALE
-            nudge_y = -4 * SCALE
-            paste_x = int(round(seal_center[0] - (iso_final_size / 2.0) - nudge_x))
-            paste_y = int(round(seal_center[1] - (iso_final_size / 2.0) - nudge_y))
+            # 4. Perfect Centering
+            paste_x = int(round(seal_center[0] - (iso_final_size / 2.0)))
+            paste_y = int(round(seal_center[1] - (iso_final_size / 2.0)))
             img.paste(iso_img_final, (paste_x, paste_y), iso_img_final)
         except Exception:
             pass
