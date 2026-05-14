@@ -1731,6 +1731,9 @@ class PreviewCertificateView(View):
         draw = ImageDraw.Draw(img)
 
         def find_font_file(font_name):
+            if not font_name:
+                return None
+
             if os.path.isabs(font_name) and os.path.exists(font_name):
                 return font_name
 
@@ -1746,14 +1749,6 @@ class PreviewCertificateView(View):
                 if os.path.exists(candidate):
                     return candidate
 
-            system_dirs = [
-                os.path.join("C:", "Windows", "Fonts"),
-                os.path.join("/usr", "share", "fonts"),
-                os.path.join("/usr", "local", "share", "fonts"),
-                os.path.expanduser("~/.fonts"),
-                os.path.join("/Library", "Fonts"),
-                os.path.join("/System", "Library", "Fonts"),
-            ]
             candidate_names = [font_name]
             lower = font_name.lower()
             if "times" in lower or "serif" in lower:
@@ -1784,14 +1779,58 @@ class PreviewCertificateView(View):
                     "FreeSerif.ttf",
                 ])
 
+            system_dirs = [
+                os.path.join("C:", "Windows", "Fonts"),
+                os.path.join("/usr", "share", "fonts"),
+                os.path.join("/usr", "local", "share", "fonts"),
+                os.path.expanduser("~/.fonts"),
+                os.path.join("/Library", "Fonts"),
+                os.path.join("/System", "Library", "Fonts"),
+                os.path.join("/usr", "share", "fonts", "truetype"),
+                os.path.join("/usr", "share", "fonts", "opentype"),
+            ]
+
             for dir_path in system_dirs:
-                if not dir_path or not os.path.exists(dir_path):
+                if not dir_path or not os.path.isdir(dir_path):
                     continue
                 for candidate in candidate_names:
                     candidate_path = os.path.join(dir_path, candidate)
                     if os.path.exists(candidate_path):
                         return candidate_path
 
+            # Last resort: any valid TrueType/OpenType font on the host.
+            for dir_path in system_dirs:
+                if not os.path.isdir(dir_path):
+                    continue
+                for root, _, files in os.walk(dir_path):
+                    for file_name in files:
+                        if file_name.lower().endswith((".ttf", ".otf")):
+                            candidate_path = os.path.join(root, file_name)
+                            if os.path.exists(candidate_path):
+                                return candidate_path
+
+            return None
+
+        def find_any_font_file():
+            system_dirs = [
+                os.path.join("C:", "Windows", "Fonts"),
+                os.path.join("/usr", "share", "fonts"),
+                os.path.join("/usr", "local", "share", "fonts"),
+                os.path.expanduser("~/.fonts"),
+                os.path.join("/Library", "Fonts"),
+                os.path.join("/System", "Library", "Fonts"),
+                os.path.join("/usr", "share", "fonts", "truetype"),
+                os.path.join("/usr", "share", "fonts", "opentype"),
+            ]
+            for dir_path in system_dirs:
+                if not os.path.isdir(dir_path):
+                    continue
+                for root, _, files in os.walk(dir_path):
+                    for file_name in files:
+                        if file_name.lower().endswith((".ttf", ".otf")):
+                            candidate_path = os.path.join(root, file_name)
+                            if os.path.exists(candidate_path):
+                                return candidate_path
             return None
 
         def get_font(font_name, size):
@@ -1819,6 +1858,13 @@ class PreviewCertificateView(View):
                     return ImageFont.truetype(path, scaled_size)
                 except OSError:
                     continue
+
+            any_font = find_any_font_file()
+            if any_font:
+                try:
+                    return ImageFont.truetype(any_font, scaled_size)
+                except OSError:
+                    pass
 
             return ImageFont.load_default()
 
