@@ -215,12 +215,12 @@ def generate_and_send_certificate(result):
 
     # Scaled Fonts
     font_cert = get_font("times.ttf", 85)
-    font_sub = get_font("arial.ttf", 32)
-    font_present = get_font("arial.ttf", 22)
+    font_sub = get_font("times.ttf", 32)
+    font_present = get_font("times.ttf", 22)
     font_name = get_font("times.ttf", 78) # Decreased 2pts as requested
     font_course = get_font("times.ttf", 42) # Changed to elegant serif (Times)
-    font_content = get_font("arial.ttf", 24)
-    font_footer = get_font("arial.ttf", 20)
+    font_content = get_font("times.ttf", 24)
+    font_footer = get_font("times.ttf", 20)
 
     # Better wave implementation using polygons for accuracy
     import math
