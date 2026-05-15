@@ -205,13 +205,50 @@ def generate_and_send_certificate(result):
 
     def get_font(font_name, size):
         scaled_size = int(size * SCALE)
-        try:
-            return ImageFont.truetype(font_name, scaled_size)
-        except OSError:
+        import platform
+        
+        # Platform-specific system font paths
+        font_paths = []
+        system = platform.system()
+        
+        if system == "Windows":
+            font_paths = [
+                f"C:\\Windows\\Fonts\\{font_name}",
+                f"C:\\Windows\\Fonts\\times.ttf",
+                f"C:\\Windows\\Fonts\\calibrib.ttf",
+            ]
+        elif system == "Darwin":  # macOS
+            font_paths = [
+                f"/Library/Fonts/{font_name}",
+                "/Library/Fonts/Times New Roman.ttf",
+                "/System/Library/Fonts/Helvetica.ttc",
+            ]
+        else:  # Linux
+            font_paths = [
+                f"/usr/share/fonts/truetype/liberation/{font_name}",
+                "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",
+                f"/usr/share/fonts/truetype/dejavu/{font_name}",
+            ]
+        
+        # Try each font path
+        for path in font_paths:
+            if os.path.exists(path):
+                try:
+                    return ImageFont.truetype(path, scaled_size)
+                except Exception:
+                    continue
+        
+        # Try simple font names as fallback
+        simple_names = [font_name, "times.ttf", "arial.ttf", "LiberationSerif-Regular.ttf"]
+        for fname in simple_names:
             try:
-                return ImageFont.truetype("arial.ttf", scaled_size)
+                return ImageFont.truetype(fname, scaled_size)
             except OSError:
-                return ImageFont.load_default()
+                continue
+        
+        # Last resort: use default font with size 
+        return ImageFont.load_default()
 
     # Scaled Fonts
     font_cert = get_font("times.ttf", 85)
