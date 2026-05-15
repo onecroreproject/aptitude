@@ -203,35 +203,50 @@ def generate_and_send_certificate(result):
     img = Image.new("RGB", (WIDTH, HEIGHT), color="#FFFFFF")
     draw = ImageDraw.Draw(img)
 
-    def get_font(font_name, size):
+    def get_font(font_file, size):
+        """
+        Load font from static/fonts/ directory with intelligent fallback system.
+        Works consistently on localhost and live servers (Windows/Linux/macOS).
+        """
         scaled_size = int(size * SCALE)
         import platform
         
-        # Platform-specific system font paths
+        # 1. Try Django static fonts directory first (project-bundled fonts)
+        static_font_path = os.path.join(settings.BASE_DIR, 'static', 'fonts', font_file)
+        if os.path.exists(static_font_path):
+            try:
+                return ImageFont.truetype(static_font_path, scaled_size)
+            except Exception:
+                pass
+        
+        # 2. Platform-specific system font paths with correct file names
         font_paths = []
         system = platform.system()
         
         if system == "Windows":
+            # Windows system fonts directory
             font_paths = [
-                f"C:\\Windows\\Fonts\\{font_name}",
-                f"C:\\Windows\\Fonts\\times.ttf",
-                f"C:\\Windows\\Fonts\\calibrib.ttf",
+                os.path.join("C:\\Windows\\Fonts", font_file),
+                os.path.join("C:\\Windows\\Fonts", "TIMES.TTF"),
+                os.path.join("C:\\Windows\\Fonts", "arial.ttf"),
             ]
         elif system == "Darwin":  # macOS
             font_paths = [
-                f"/Library/Fonts/{font_name}",
+                os.path.join("/Library/Fonts", font_file),
                 "/Library/Fonts/Times New Roman.ttf",
                 "/System/Library/Fonts/Helvetica.ttc",
             ]
-        else:  # Linux
+        else:  # Linux (production server)
             font_paths = [
-                f"/usr/share/fonts/truetype/liberation/{font_name}",
+                f"/usr/share/fonts/truetype/liberation/{font_file}",
                 "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf",
+                "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf",
                 "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",
-                f"/usr/share/fonts/truetype/dejavu/{font_name}",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf",
+                f"/usr/share/fonts/truetype/dejavu/{font_file}",
             ]
         
-        # Try each font path
+        # 3. Try system paths
         for path in font_paths:
             if os.path.exists(path):
                 try:
@@ -239,25 +254,31 @@ def generate_and_send_certificate(result):
                 except Exception:
                     continue
         
-        # Try simple font names as fallback
-        simple_names = [font_name, "times.ttf", "arial.ttf", "LiberationSerif-Regular.ttf"]
-        for fname in simple_names:
+        # 4. Ultimate fallback: reliable fonts by name (cross-platform)
+        fallback_fonts = [
+            "LiberationSerif-Regular.ttf",
+            "LiberationSans-Regular.ttf",
+            "DejaVuSerif.ttf",
+            font_file,  # Try original again
+        ]
+        for fname in fallback_fonts:
             try:
                 return ImageFont.truetype(fname, scaled_size)
-            except OSError:
+            except (OSError, TypeError):
                 continue
         
-        # Last resort: use default font with size 
+        # 5. Last resort: default font
         return ImageFont.load_default()
 
-    # Scaled Fonts
-    font_cert = get_font("times.ttf", 85)
-    font_sub = get_font("times.ttf", 32)
-    font_present = get_font("times.ttf", 22)
-    font_name = get_font("times.ttf", 78) # Decreased 2pts as requested
-    font_course = get_font("times.ttf", 42) # Changed to elegant serif (Times)
-    font_content = get_font("times.ttf", 24)
-    font_footer = get_font("times.ttf", 20)
+    # Scaled Professional Fonts for Certificate
+    # Each font styled for maximum visual consistency between localhost and production
+    font_cert = get_font("LiberationSerif-Bold.ttf", 85)          # Certificate Title
+    font_sub = get_font("LiberationSerif-Bold.ttf", 32)           # Sub-headings (Of Achievement)
+    font_present = get_font("LiberationSerif-Regular.ttf", 22)    # Presenter Line
+    font_name = get_font("LiberationSerif-Bold.ttf", 78)          # Student Name (Bold for prominence)
+    font_course = get_font("LiberationSerif-Bold.ttf", 42)        # Course/Category Name
+    font_content = get_font("LiberationSerif-Regular.ttf", 24)    # Description Content
+    font_footer = get_font("LiberationSerif-Regular.ttf", 20)     # Footer (Signature, Date)
 
     # Better wave implementation using polygons for accuracy
     import math
