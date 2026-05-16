@@ -272,13 +272,13 @@ def generate_and_send_certificate(result):
 
     # Scaled Professional Fonts for Certificate
     # Each font styled for maximum visual consistency between localhost and production
-    font_cert = get_font("LiberationSerif-Bold.ttf", 85)          # Certificate Title
-    font_sub = get_font("LiberationSerif-Bold.ttf", 32)           # Sub-headings (Of Achievement)
-    font_present = get_font("LiberationSerif-Regular.ttf", 22)    # Presenter Line
-    font_name = get_font("LiberationSerif-Bold.ttf", 78)          # Student Name (Bold for prominence)
-    font_course = get_font("LiberationSerif-Bold.ttf", 42)        # Course/Category Name
-    font_content = get_font("LiberationSerif-Regular.ttf", 24)    # Description Content
-    font_footer = get_font("LiberationSerif-Regular.ttf", 20)     # Footer (Signature, Date)
+    font_cert = get_font("LiberationSans-Bold.ttf", 85)           # Certificate Title
+    font_sub = get_font("LiberationSans-Bold.ttf", 32)            # Sub-headings (Of Achievement)
+    font_present = get_font("LiberationSans-Regular.ttf", 22)     # Presenter Line
+    font_name = get_font("LiberationSans-Bold.ttf", 78)           # Student Name (Bold for prominence)
+    font_course = get_font("LiberationSans-Bold.ttf", 42)         # Course/Category Name
+    font_content = get_font("LiberationSans-Regular.ttf", 24)     # Description Content
+    font_footer = get_font("LiberationSans-Regular.ttf", 20)      # Footer (Signature, Date)
 
     # Better wave implementation using polygons for accuracy
     import math
