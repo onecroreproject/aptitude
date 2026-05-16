@@ -119,10 +119,18 @@ class LoginView(View):
             user = form.get_user()
             login(request, user)
             messages.success(request, f'Welcome back, {user.username}!')
-            
-            # Redirect based on role/permissions
-            if user.is_superuser or user.role == CustomUser.Role.SUB_ADMIN:
+
+            # Superusers (including accounts created via `python manage.py
+            # createsuperuser`) ALWAYS land on the admin dashboard, regardless
+            # of what the `role` field happens to be — `createsuperuser` does
+            # not touch the role column, so it stays at its model default
+            # ('Student'), and we must not let that mislead the redirect.
+            if user.is_superuser:
                 return redirect('admin_dashboard')
+            # Sub-Admins (non-superuser staff role) also use the admin panel.
+            if user.role == CustomUser.Role.SUB_ADMIN:
+                return redirect('admin_dashboard')
+            # Everyone else is a regular student.
             return redirect('student_dashboard')
         return render(request, 'exams/login.html', {'form': form})
 
@@ -384,8 +392,17 @@ class SubAdminResetPasswordView(View):
 
 @login_required
 def dashboard_redirect(request):
-    """Route /dashboard/ to the correct interface based on role."""
-    if request.user.is_superuser:
+    """Route /dashboard/ to the correct interface based on role.
+
+    Superusers (Admins) and Sub-Admins are sent to the admin dashboard;
+    every other authenticated user goes to the student dashboard. This
+    mirrors the routing logic in ``LoginView.dispatch`` / ``LoginView.post``
+    so that the post-login landing page is consistent regardless of whether
+    the user arrives via the login form or via ``@login_required``'s
+    ``LOGIN_REDIRECT_URL``.
+    """
+    user = request.user
+    if user.is_superuser or user.role == CustomUser.Role.SUB_ADMIN:
         return redirect('admin_dashboard')
     return redirect('student_dashboard')
 

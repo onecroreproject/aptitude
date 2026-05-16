@@ -29,6 +29,8 @@ from django.core.validators import (
     RegexValidator,
 )
 from django.db import models
+from django.db.models.signals import pre_save, post_delete
+from django.dispatch import receiver
 from django.utils import timezone
 
 
@@ -156,6 +158,42 @@ class CustomUser(AbstractUser):
             raise ValidationError(
                 {'role': 'Sub Admins cannot have superuser privileges.'}
             )
+
+
+# ──────────────────────────────────────────────
+# CustomUser file-cleanup signals
+# (delete the previous profile photo from disk so the media folder
+#  doesn't accumulate orphaned uploads when users replace their picture
+#  or delete their account)
+# ──────────────────────────────────────────────
+
+@receiver(pre_save, sender=CustomUser)
+def _delete_old_profile_photo(sender, instance, **kwargs):
+    """When profile_photo is replaced, remove the previous file from disk."""
+    if not instance.pk:
+        return  # new user, nothing to compare
+    try:
+        old_instance = sender.objects.get(pk=instance.pk)
+    except sender.DoesNotExist:
+        return
+    old_photo = old_instance.profile_photo
+    new_photo = instance.profile_photo
+    if old_photo and old_photo != new_photo:
+        try:
+            old_photo.delete(save=False)
+        except Exception:
+            # Never block the save just because the old file is missing.
+            pass
+
+
+@receiver(post_delete, sender=CustomUser)
+def _delete_profile_photo_on_user_delete(sender, instance, **kwargs):
+    """Remove the photo from disk when the user record is deleted."""
+    if instance.profile_photo:
+        try:
+            instance.profile_photo.delete(save=False)
+        except Exception:
+            pass
 
 
 class OTP(models.Model):
