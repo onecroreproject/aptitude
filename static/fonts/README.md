@@ -1,19 +1,35 @@
 # Certificate Fonts Configuration
 
 ## Overview
-This directory contains font files for certificate generation. The system uses professional serif fonts to ensure consistent rendering across localhost and production servers.
+This directory contains the premium variable-weight TTF font files used to
+render certificates as PNG images (`exams/utils.py` for emailed/downloaded
+certificates and `exams/views.py::PreviewCertificateView` for the live
+preview). All three are SIL Open Font License (OFL) — free for commercial use.
 
-## Current Font Configuration
-The certificate generation system (`exams/utils.py`) uses **Liberation Serif** fonts as the primary choice, which are:
-- ✓ Available on all Linux servers (standard system fonts)
-- ✓ Available on Windows systems
-- ✓ Available on macOS
-- ✓ Provides consistent rendering everywhere
-- ✓ Professional appearance for certificates
+## Editorial Luxury Pairing (active)
 
-## Fonts Used
-- **Liberation Serif Bold** → Certificate Title, Student Name, Course Name
-- **Liberation Serif Regular** → Description Text, Footer
+| Role on certificate                | Family               | Weight (axis) |
+|------------------------------------|----------------------|---------------|
+| Certificate Title (`CERTIFICATE`)  | Playfair Display     | 700 Bold      |
+| Student Name                       | Playfair Display     | 700 Bold      |
+| Sub-heading pill (`OF ACHIEVEMENT`)| Cormorant Garamond   | 700 Bold      |
+| Presenter line                     | Cormorant Garamond   | 500 Medium    |
+| Course banner                      | Cormorant Garamond   | 700 Bold      |
+| Body description                   | Montserrat           | 400 Regular   |
+| Footer (`SIGNATURE`, `DATE`)       | Montserrat           | 500 Medium    |
+
+## Font files bundled
+
+These are variable fonts — a single TTF per family encodes every weight from
+100 to 900. PIL/Pillow selects the weight at render time via
+`set_variation_by_axes([weight])`.
+
+```
+static/fonts/
+├── PlayfairDisplay-Variable.ttf     (~293 KB)
+├── CormorantGaramond-Variable.ttf   (~1.2 MB)
+└── Montserrat-Variable.ttf          (~727 KB)
+```
 
 ## How to Add Custom Premium Fonts
 

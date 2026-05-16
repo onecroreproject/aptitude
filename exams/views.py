@@ -1833,36 +1833,52 @@ class PreviewCertificateView(View):
                                 return candidate_path
             return None
 
-        def get_font(font_name, size):
+        def _apply_variation(font_obj, weight):
+            """Set the weight axis on variable fonts; no-op on static fonts."""
+            if weight is None or font_obj is None:
+                return font_obj
+            try:
+                font_obj.set_variation_by_axes([int(weight)])
+            except (AttributeError, OSError, ValueError, TypeError):
+                pass
+            return font_obj
+
+        def get_font(font_name, size, weight=None):
             scaled_size = int(size * SCALE)
             font_path = find_font_file(font_name)
             if font_path:
                 try:
-                    return ImageFont.truetype(font_path, scaled_size)
+                    return _apply_variation(
+                        ImageFont.truetype(font_path, scaled_size), weight
+                    )
                 except OSError:
                     pass
 
             fallback_fonts = [
-                "DejaVuSerif.ttf",
+                "DejaVuSans-Bold.ttf",
                 "DejaVuSans.ttf",
-                "LiberationSerif-Regular.ttf",
+                "LiberationSans-Bold.ttf",
                 "LiberationSans-Regular.ttf",
                 "Arial.ttf",
-                "Times.ttf",
-                "FreeSerif.ttf",
                 "FreeSans.ttf",
+                "DejaVuSerif.ttf",
+                "LiberationSerif-Regular.ttf",
             ]
 
             for path in fallback_fonts:
                 try:
-                    return ImageFont.truetype(path, scaled_size)
+                    return _apply_variation(
+                        ImageFont.truetype(path, scaled_size), weight
+                    )
                 except OSError:
                     continue
 
             any_font = find_any_font_file()
             if any_font:
                 try:
-                    return ImageFont.truetype(any_font, scaled_size)
+                    return _apply_variation(
+                        ImageFont.truetype(any_font, scaled_size), weight
+                    )
                 except OSError:
                     pass
 
@@ -1905,14 +1921,22 @@ class PreviewCertificateView(View):
 
         resample_filter = get_resampling_filter()
 
-        # Scaled Fonts
-        font_cert = get_font("times.ttf", 85)
-        font_sub = get_font("arial.ttf", 32)
-        font_present = get_font("arial.ttf", 22)
-        font_name = get_font("times.ttf", 78)
-        font_course = get_font("times.ttf", 42)
-        font_content = get_font("arial.ttf", 24)
-        font_footer = get_font("arial.ttf", 20)
+        # ─── Premium Certificate Typography (Editorial Luxury pairing) ──────
+        # Title & Student Name : Playfair Display Bold      (elegant editorial serif)
+        # Sub-headings & Course: Cormorant Garamond Bold/Medium (luxury serif)
+        # Body & Footer        : Montserrat Regular/Medium  (clean modern sans)
+        # Bundled variable fonts in static/fonts/; weight axis selected at render time.
+        PLAYFAIR = "PlayfairDisplay-Variable.ttf"
+        CORMORANT = "CormorantGaramond-Variable.ttf"
+        MONTSERRAT = "Montserrat-Variable.ttf"
+
+        font_cert    = get_font(PLAYFAIR,   85, weight=700)   # Certificate Title (Bold)
+        font_sub     = get_font(CORMORANT,  32, weight=700)   # "OF ACHIEVEMENT" pill
+        font_present = get_font(CORMORANT,  22, weight=500)   # Presenter Line (Medium)
+        font_name    = get_font(PLAYFAIR,   78, weight=700)   # Student Name (Bold)
+        font_course  = get_font(CORMORANT,  42, weight=700)   # Course banner (Bold)
+        font_content = get_font(MONTSERRAT, 24, weight=400)   # Body description (Regular)
+        font_footer  = get_font(MONTSERRAT, 20, weight=500)   # Footer (Medium)
 
         # Better wave implementation using polygons for accuracy
         import math
@@ -2066,7 +2090,7 @@ class PreviewCertificateView(View):
                 spacing -= int(1 * SCALE)
 
             for font_size in range(78, int(78 * 0.55), -2):
-                temp_font = get_font("times.ttf", font_size)
+                temp_font = get_font(PLAYFAIR, font_size, weight=700)
                 if total_text_width(temp_font, min_spacing) <= max_width:
                     return temp_font, min_spacing
 

@@ -203,82 +203,114 @@ def generate_and_send_certificate(result):
     img = Image.new("RGB", (WIDTH, HEIGHT), color="#FFFFFF")
     draw = ImageDraw.Draw(img)
 
-    def get_font(font_file, size):
+    def _apply_variation(font_obj, weight):
+        """Best-effort weight selection for variable fonts (PIL>=9 / FreeType>=2.9).
+        Silently no-ops on static fonts or older PIL versions.
+        """
+        if weight is None or font_obj is None:
+            return font_obj
+        try:
+            font_obj.set_variation_by_axes([int(weight)])
+        except (AttributeError, OSError, ValueError, TypeError):
+            pass
+        return font_obj
+
+    def get_font(font_file, size, weight=None, fallbacks=None):
         """
         Load font from static/fonts/ directory with intelligent fallback system.
+        Supports variable-weight fonts (Playfair Display, Cormorant Garamond,
+        Montserrat) via the optional ``weight`` axis value (e.g. 400, 500, 700).
         Works consistently on localhost and live servers (Windows/Linux/macOS).
         """
         scaled_size = int(size * SCALE)
         import platform
-        
+
+        candidate_files = [font_file] + list(fallbacks or [])
+
         # 1. Try Django static fonts directory first (project-bundled fonts)
-        static_font_path = os.path.join(settings.BASE_DIR, 'static', 'fonts', font_file)
-        if os.path.exists(static_font_path):
-            try:
-                return ImageFont.truetype(static_font_path, scaled_size)
-            except Exception:
-                pass
-        
+        for fname in candidate_files:
+            static_font_path = os.path.join(settings.BASE_DIR, 'static', 'fonts', fname)
+            if os.path.exists(static_font_path):
+                try:
+                    return _apply_variation(
+                        ImageFont.truetype(static_font_path, scaled_size), weight
+                    )
+                except Exception:
+                    pass
+
         # 2. Platform-specific system font paths with correct file names
         font_paths = []
         system = platform.system()
-        
+
         if system == "Windows":
-            # Windows system fonts directory
-            font_paths = [
-                os.path.join("C:\\Windows\\Fonts", font_file),
-                os.path.join("C:\\Windows\\Fonts", "TIMES.TTF"),
-                os.path.join("C:\\Windows\\Fonts", "arial.ttf"),
+            font_paths = [os.path.join("C:\\Windows\\Fonts", f) for f in candidate_files] + [
+                "C:\\Windows\\Fonts\\arial.ttf",
+                "C:\\Windows\\Fonts\\TIMES.TTF",
             ]
         elif system == "Darwin":  # macOS
-            font_paths = [
-                os.path.join("/Library/Fonts", font_file),
+            font_paths = [os.path.join("/Library/Fonts", f) for f in candidate_files] + [
                 "/Library/Fonts/Times New Roman.ttf",
                 "/System/Library/Fonts/Helvetica.ttc",
             ]
         else:  # Linux (production server)
-            font_paths = [
-                f"/usr/share/fonts/truetype/liberation/{font_file}",
-                "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf",
-                "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf",
-                "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",
-                "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf",
-                f"/usr/share/fonts/truetype/dejavu/{font_file}",
+            font_paths = []
+            for f in candidate_files:
+                font_paths += [
+                    f"/usr/share/fonts/truetype/{f}",
+                    f"/usr/share/fonts/truetype/liberation/{f}",
+                    f"/usr/share/fonts/truetype/dejavu/{f}",
+                ]
+            font_paths += [
+                "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+                "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
             ]
-        
+
         # 3. Try system paths
         for path in font_paths:
             if os.path.exists(path):
                 try:
-                    return ImageFont.truetype(path, scaled_size)
+                    return _apply_variation(
+                        ImageFont.truetype(path, scaled_size), weight
+                    )
                 except Exception:
                     continue
-        
+
         # 4. Ultimate fallback: reliable fonts by name (cross-platform)
-        fallback_fonts = [
-            "LiberationSerif-Regular.ttf",
+        fallback_fonts = candidate_files + [
+            "LiberationSans-Bold.ttf",
             "LiberationSans-Regular.ttf",
-            "DejaVuSerif.ttf",
-            font_file,  # Try original again
+            "DejaVuSans-Bold.ttf",
+            "DejaVuSans.ttf",
         ]
         for fname in fallback_fonts:
             try:
-                return ImageFont.truetype(fname, scaled_size)
+                return _apply_variation(
+                    ImageFont.truetype(fname, scaled_size), weight
+                )
             except (OSError, TypeError):
                 continue
-        
+
         # 5. Last resort: default font
         return ImageFont.load_default()
 
-    # Scaled Professional Fonts for Certificate
-    # Each font styled for maximum visual consistency between localhost and production
-    font_cert = get_font("LiberationSans-Bold.ttf", 85)           # Certificate Title
-    font_sub = get_font("LiberationSans-Bold.ttf", 32)            # Sub-headings (Of Achievement)
-    font_present = get_font("LiberationSans-Regular.ttf", 22)     # Presenter Line
-    font_name = get_font("LiberationSans-Bold.ttf", 78)           # Student Name (Bold for prominence)
-    font_course = get_font("LiberationSans-Bold.ttf", 42)         # Course/Category Name
-    font_content = get_font("LiberationSans-Regular.ttf", 24)     # Description Content
-    font_footer = get_font("LiberationSans-Regular.ttf", 20)      # Footer (Signature, Date)
+    # ─── Premium Certificate Typography (Editorial Luxury pairing) ──────────
+    # Title & Student Name : Playfair Display Bold      (elegant editorial serif)
+    # Sub-headings & Course: Cormorant Garamond Bold/Medium (luxury serif)
+    # Body & Footer        : Montserrat Regular/Medium  (clean modern sans)
+    # All variable fonts; weight axis selected at render time.
+    PLAYFAIR = "PlayfairDisplay-Variable.ttf"
+    CORMORANT = "CormorantGaramond-Variable.ttf"
+    MONTSERRAT = "Montserrat-Variable.ttf"
+
+    font_cert    = get_font(PLAYFAIR,   85, weight=700)   # Certificate Title (Bold)
+    font_sub     = get_font(CORMORANT,  32, weight=700)   # "OF ACHIEVEMENT" pill
+    font_present = get_font(CORMORANT,  22, weight=500)   # Presenter Line (Medium)
+    font_name    = get_font(PLAYFAIR,   78, weight=700)   # Student Name (Bold)
+    font_course  = get_font(CORMORANT,  42, weight=700)   # Course banner (Bold)
+    font_content = get_font(MONTSERRAT, 24, weight=400)   # Body description (Regular)
+    font_footer  = get_font(MONTSERRAT, 20, weight=500)   # Footer (Medium)
 
     # Better wave implementation using polygons for accuracy
     import math
