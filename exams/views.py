@@ -91,9 +91,27 @@ class RegisterView(View):
             return redirect('student_dashboard')
         return render(request, 'exams/register.html', {'form': form})
 
+class ValidateStudentFieldAPI(View):
+    """API for real-time duplicate checking during student registration."""
+    def get(self, request):
+        field = request.GET.get('field', '').strip()
+        value = request.GET.get('value', '').strip()
 
+        if not field or not value:
+            return JsonResponse({'exists': False, 'error': 'Missing field or value'}, status=400)
 
+        # Allowed fields for duplicate checking
+        allowed_fields = ['username', 'email', 'phone_number', 'admission_number', 'roll_number']
+        if field not in allowed_fields:
+            return JsonResponse({'exists': False, 'error': 'Invalid field'}, status=400)
 
+        # Construct the query
+        query = {field: value}
+        
+        # Check existence
+        exists = CustomUser.objects.filter(**query).exists()
+        
+        return JsonResponse({'exists': exists, 'field': field, 'value': value})
 
 class LoginView(View):
     """Login view — routes to appropriate dashboard based on role."""
@@ -469,6 +487,8 @@ class StudentProfileView(StudentRequiredMixin, View):
             form.save()
             messages.success(request, 'Profile updated successfully.')
             return redirect('student_profile')
+        else:
+            messages.error(request, 'Please correct the errors below.')
         return render(request, 'exams/student/profile.html', {'form': form})
 
 
@@ -485,6 +505,8 @@ class AdminProfileView(SuperuserRequiredMixin, View):
             form.save()
             messages.success(request, 'Profile updated successfully.')
             return redirect('admin_profile')
+        else:
+            messages.error(request, 'Please correct the errors below.')
         return render(request, 'exams/admin/profile.html', {'form': form})
 
 
@@ -501,6 +523,8 @@ class SubAdminProfileView(BaseAdminRequiredMixin, View):
             form.save()
             messages.success(request, 'Profile updated successfully.')
             return redirect('subadmin_profile')
+        else:
+            messages.error(request, 'Please correct the errors below.')
         return render(request, 'exams/subadmin/profile.html', {'form': form})
 
 
@@ -804,13 +828,24 @@ class AdminSubAdminsView(SuperuserRequiredMixin, ListView):
     """List all Sub-Admins."""
     template_name = 'exams/admin/subadmins.html'
     context_object_name = 'subadmins'
+    paginate_by = 10
     
     def get_queryset(self):
-        return CustomUser.objects.filter(role=CustomUser.Role.SUB_ADMIN).order_by('-date_joined')
+        qs = CustomUser.objects.filter(role=CustomUser.Role.SUB_ADMIN).order_by('-date_joined')
+        search = self.request.GET.get('search', '').strip()
+        if search:
+            qs = qs.filter(
+                Q(username__icontains=search) |
+                Q(first_name__icontains=search) |
+                Q(last_name__icontains=search) |
+                Q(email__icontains=search)
+            )
+        return qs
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx['form'] = SubAdminForm()
+        ctx['search'] = self.request.GET.get('search', '')
         return ctx
 
 
@@ -1050,7 +1085,7 @@ class AdminQuestionsView(BaseAdminRequiredMixin, ListView):
     paginate_by = 25
 
     def get_queryset(self):
-        qs = Question.objects.filter(is_active=True).order_by('-created_at')
+        qs = Question.objects.select_related('category').filter(is_active=True).order_by('-created_at')
         category = self.request.GET.get('category', '').strip()
         difficulty = self.request.GET.get('difficulty', '').strip()
         q_type = self.request.GET.get('type', '').strip()
@@ -1261,7 +1296,7 @@ class AdminExamRequestsView(BaseAdminRequiredMixin, ListView):
     paginate_by = 20
 
     def get_queryset(self):
-        qs = ExamRequest.objects.select_related('student').order_by('-requested_at')
+        qs = ExamRequest.objects.select_related('student', 'category').order_by('-requested_at')
         status = self.request.GET.get('status', '').strip()
         if status:
             qs = qs.filter(status=status)

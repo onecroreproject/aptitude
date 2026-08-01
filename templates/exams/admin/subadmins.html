@@ -6,9 +6,16 @@
 
 {% block content %}
 <div class="card">
-  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
+  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
     <div class="card-title">Manage Sub-Admins</div>
-    <button onclick="openAddModal()" class="btn btn-primary">+ Create New Sub-Admin</button>
+    
+    <form method="get" style="display: flex; gap: 12px; flex: 1; max-width: 400px; justify-content: flex-end;">
+      <input type="text" name="search" class="form-input" placeholder="Search by name, username or email..." value="{{ search }}" style="border-radius: 8px; border: 1px solid var(--border-color); padding: 8px 12px; background: var(--bg-secondary); width: 100%;">
+      <button type="submit" class="btn btn-primary btn-sm" style="padding: 8px 16px;">Search</button>
+      {% if search %}<a href="{% url 'admin_subadmins' %}" class="btn btn-outline btn-sm" style="padding: 8px 16px;">Clear</a>{% endif %}
+    </form>
+
+    <button onclick="openAddModal()" class="btn btn-primary">+ Create New</button>
   </div>
   
   <div class="table-container">
@@ -20,6 +27,7 @@
           <th>Email</th>
           <th>Contact Number</th>
           <th>Role</th>
+          <th>Status</th>
           <th>Password</th>
           <th>Created Date</th>
           <th>⚙️ Actions</th>
@@ -32,7 +40,14 @@
             <td>{{ sa.username }}</td>
             <td>{{ sa.email }}</td>
             <td>{{ sa.phone_number|default:"N/A" }}</td>
-            <td><span class="badge badge-approved">{{ sa.role }}</span></td>
+            <td><span class="badge badge-approved" style="background: var(--accent-primary-light); color: var(--accent-primary);">{{ sa.role }}</span></td>
+            <td>
+              {% if sa.is_active %}
+                <span class="badge badge-approved">Active</span>
+              {% else %}
+                <span class="badge badge-rejected">Inactive</span>
+              {% endif %}
+            </td>
             <td>
                 <span class="password-hidden" id="pass-{{ sa.id }}">********</span>
                 <button onclick="togglePassword('{{ sa.id }}', '{{ sa.raw_password }}')" style="border: none; background: none; cursor: pointer; margin-left: 8px;">👁️</button>
@@ -60,6 +75,18 @@
       </tbody>
     </table>
   </div>
+
+  {% if is_paginated %}
+  <div style="margin-top: 24px; display: flex; justify-content: center; gap: 8px;">
+      {% if page_obj.has_previous %}
+          <a href="?page={{ page_obj.previous_page_number }}&search={{ search }}" class="btn btn-outline btn-sm">Previous</a>
+      {% endif %}
+      <span style="padding: 4px 12px; font-weight: 600;">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}
+          <a href="?page={{ page_obj.next_page_number }}&search={{ search }}" class="btn btn-outline btn-sm">Next</a>
+      {% endif %}
+  </div>
+  {% endif %}
 </div>
 
 <!-- Add/Edit Sub-Admin Modal (Hidden by Default) -->

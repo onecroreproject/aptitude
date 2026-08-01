@@ -32,13 +32,10 @@ admin.site.index_title = "Welcome to Aptipro Portal"
 # We expose /media/ via Django's static serve view in BOTH dev and production
 # so that profile_photo.url works on cPanel/Passenger deployments where we
 # cannot edit the Apache config to add a media alias.
-urlpatterns += [
-    re_path(
-        r'^%s(?P<path>.*)$' % settings.MEDIA_URL.lstrip('/'),
-        static_serve,
-        {'document_root': settings.MEDIA_ROOT},
-    ),
-]
+urlpatterns += static(
+    settings.MEDIA_URL,
+    document_root=settings.MEDIA_ROOT
+)
 
 # Static files: served by WhiteNoise in production; only need Django's
 # fallback in DEBUG mode for the dev runserver.

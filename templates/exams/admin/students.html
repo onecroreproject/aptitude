@@ -44,8 +44,8 @@
                         <td><input type="checkbox" name="selected_ids" value="{{ s.id }}" class="record-checkbox"></td>
                         <td>
                             <div style="display: flex; align-items: center; gap: 12px;">
-                            {% if s.profile_photo %}
-                                <img src="{{ s.profile_photo.url }}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1.5px solid var(--border-color);">
+                            {% if s.profile_image %}
+                                <img src="{{ s.profile_image.url }}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1.5px solid var(--border-color);">
                             {% else %}
                                 <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--accent-primary-light); color: var(--accent-primary); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; border: 1.5px solid var(--accent-primary-light);">
                                     {{ s.username.0|upper }}

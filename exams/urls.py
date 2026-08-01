@@ -9,6 +9,7 @@ urlpatterns = [
     # ── Authentication ───────────────────────────
     path('', views.LoginView.as_view(), name='home'),
     path('register/', views.RegisterView.as_view(), name='register'),
+    path('api/validate-field/', views.ValidateStudentFieldAPI.as_view(), name='api_validate_field'),
 
     path('login/', views.LoginView.as_view(), name='login'),
     path('logout/', views.LogoutView.as_view(), name='logout'),

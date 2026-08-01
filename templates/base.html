@@ -71,7 +71,7 @@
       </nav>
 
       <div style="padding: 16px; border-top: 1px solid var(--border-color);">
-        <a href="{% url 'logout' %}" class="nav-link" style="color: var(--accent-danger);">🚪 Logout</a>
+        
       </div>
     </div>
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
@@ -116,8 +116,8 @@
                 <span class="user-name">{{ user.name|default:user.username }}</span>
                 <span class="user-role">{{ user.get_role_display }}</span>
               </div>
-              {% if user.profile_photo %}
-              <img src="{{ user.profile_photo.url }}" alt="Profile" class="profile-circle">
+              {% if user.profile_image %}
+              <img src="{{ user.profile_image.url }}" alt="Profile" class="profile-circle">
               {% else %}
               <div class="profile-placeholder">{{ user.username.0|upper }}</div>
               {% endif %}
@@ -274,6 +274,32 @@
     }
 
     setInterval(fetchNotifications, 15000);
+
+    // Global Form Submission Loading State
+    document.addEventListener('submit', function(e) {
+      if (e.target && e.target.nodeName === 'FORM') {
+        const form = e.target;
+        // Don't disable buttons for forms that have data-no-loading
+        if (form.hasAttribute('data-no-loading')) return;
+        
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) {
+          // If the form is valid, show loading state
+          if (form.checkValidity()) {
+            submitBtn.disabled = true;
+            submitBtn.dataset.originalText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display:inline-block; width:1rem; height:1rem; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:spinner-border .75s linear infinite;"></span> Loading...';
+            // Also add a little style for the spinner animation
+            if (!document.getElementById('spinner-style')) {
+                const style = document.createElement('style');
+                style.id = 'spinner-style';
+                style.textContent = '@keyframes spinner-border { to { transform: rotate(360deg); } }';
+                document.head.appendChild(style);
+            }
+          }
+        }
+      }
+    });
   </script>
 
   {% block extra_js %}{% endblock %}

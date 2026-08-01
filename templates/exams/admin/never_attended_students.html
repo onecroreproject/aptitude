@@ -35,8 +35,8 @@
                 <tr>
                     <td>
                         <div style="display: flex; align-items: center; gap: 12px;">
-                            {% if student.profile_photo %}
-                                <img src="{{ student.profile_photo.url }}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">
+                            {% if student.profile_image %}
+                                <img src="{{ student.profile_image.url }}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">
                             {% else %}
                                 <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--accent-primary-light); color: var(--accent-primary); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px;">
                                     {{ student.username.0|upper }}

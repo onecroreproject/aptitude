@@ -6,7 +6,7 @@
 {% block body_class %}auth-page{% endblock %}
 
 {% block content %}
-<div class="auth-card">
+<div class="auth-card" style="max-width: 700px;">
   <div style="text-align: center; margin-bottom: 32px;">
     <div style="margin-bottom: 16px;">
       <img src="{% static 'images/Logo.png' %}" alt="Aptipro Logo" style="height: 64px; width: auto;">
@@ -16,72 +16,111 @@
     <p style="color: var(--text-muted); font-size: 14px;">Register to take personalized exams and track your results.</p>
   </div>
   
-  <form method="POST" enctype="multipart/form-data">
+  <form method="POST" enctype="multipart/form-data" id="studentRegistrationForm" novalidate>
     {% csrf_token %}
+    
     <div class="form-group">
-      <label class="label">Username</label>
+      <label class="label">Username *</label>
       {{ form.username }}
-      {% if form.username.errors %}<div style="color: var(--accent-danger); font-size: 11px;">{{ form.username.errors.0 }}</div>{% endif %}
+      <div class="live-error" id="error-username" style="color: var(--accent-danger); font-size: 12px; margin-top: 4px; display: none;"></div>
+      {% if form.username.errors %}<div style="color: var(--accent-danger); font-size: 12px;">{{ form.username.errors.0 }}</div>{% endif %}
     </div>
 
     <div class="grid-2">
       <div class="form-group">
-        <label class="label">First Name</label>
+        <label class="label">First Name *</label>
         {{ form.first_name }}
-        {% if form.first_name.errors %}<div style="color: var(--accent-danger); font-size: 11px;">{{ form.first_name.errors.0 }}</div>{% endif %}
+        <div class="live-error" id="error-first_name" style="color: var(--accent-danger); font-size: 12px; margin-top: 4px; display: none;"></div>
+        {% if form.first_name.errors %}<div style="color: var(--accent-danger); font-size: 12px;">{{ form.first_name.errors.0 }}</div>{% endif %}
       </div>
       <div class="form-group">
-        <label class="label">Last Name</label>
+        <label class="label">Last Name *</label>
         {{ form.last_name }}
-        {% if form.last_name.errors %}<div style="color: var(--accent-danger); font-size: 11px;">{{ form.last_name.errors.0 }}</div>{% endif %}
+        <div class="live-error" id="error-last_name" style="color: var(--accent-danger); font-size: 12px; margin-top: 4px; display: none;"></div>
+        {% if form.last_name.errors %}<div style="color: var(--accent-danger); font-size: 12px;">{{ form.last_name.errors.0 }}</div>{% endif %}
       </div>
     </div>
 
     <div class="form-group">
-      <label class="label">Email Address</label>
+      <label class="label">Email Address *</label>
       {{ form.email }}
-      {% if form.email.errors %}<div style="color: var(--accent-danger); font-size: 11px;">{{ form.email.errors.0 }}</div>{% endif %}
+      <div class="live-error" id="error-email" style="color: var(--accent-danger); font-size: 12px; margin-top: 4px; display: none;"></div>
+      {% if form.email.errors %}<div style="color: var(--accent-danger); font-size: 12px;">{{ form.email.errors.0 }}</div>{% endif %}
     </div>
 
     <div class="form-group">
-      <label class="label">Institution / College</label>
+      <label class="label">Institution / College *</label>
       {{ form.institution }}
-      {% if form.institution.errors %}<div style="color: var(--accent-danger); font-size: 11px;">{{ form.institution.errors.0 }}</div>{% endif %}
+      <div class="live-error" id="error-institution" style="color: var(--accent-danger); font-size: 12px; margin-top: 4px; display: none;"></div>
+      {% if form.institution.errors %}<div style="color: var(--accent-danger); font-size: 12px;">{{ form.institution.errors.0 }}</div>{% endif %}
+    </div>
+
+
+
+    <div class="form-group">
+      <label class="label">Date of Birth *</label>
+      {{ form.date_of_birth }}
+      <div class="live-error" id="error-date_of_birth" style="color: var(--accent-danger); font-size: 12px; margin-top: 4px; display: none;"></div>
+      {% if form.date_of_birth.errors %}<div style="color: var(--accent-danger); font-size: 12px;">{{ form.date_of_birth.errors.0 }}</div>{% endif %}
     </div>
 
     <div class="grid-2">
       <div class="form-group">
-        <label class="label">Phone Number</label>
+        <label class="label">Phone Number *</label>
         {{ form.phone_number }}
-        {% if form.phone_number.errors %}<div style="color: var(--accent-danger); font-size: 11px;">{{ form.phone_number.errors.0 }}</div>{% endif %}
+        <div class="live-error" id="error-phone_number" style="color: var(--accent-danger); font-size: 12px; margin-top: 4px; display: none;"></div>
+        {% if form.phone_number.errors %}<div style="color: var(--accent-danger); font-size: 12px;">{{ form.phone_number.errors.0 }}</div>{% endif %}
       </div>
       <div class="form-group">
-        <label class="label">WhatsApp Number</label>
+        <label class="label" style="display: flex; justify-content: space-between; align-items: center;">
+          <span>WhatsApp Number *</span>
+          <label style="font-size: 11px; font-weight: 500; display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-primary); text-transform: none;">
+            <input type="checkbox" id="same_as_phone"> Same as Phone Number
+          </label>
+        </label>
         {{ form.whatsapp_number }}
-        {% if form.whatsapp_number.errors %}<div style="color: var(--accent-danger); font-size: 11px;">{{ form.whatsapp_number.errors.0 }}</div>{% endif %}
+        <div class="live-error" id="error-whatsapp_number" style="color: var(--accent-danger); font-size: 12px; margin-top: 4px; display: none;"></div>
+        {% if form.whatsapp_number.errors %}<div style="color: var(--accent-danger); font-size: 12px;">{{ form.whatsapp_number.errors.0 }}</div>{% endif %}
       </div>
     </div>
 
     <div class="form-group">
-      <label class="label">Profile Photo (For Certificate)</label>
-      {{ form.profile_photo }}
-      {% if form.profile_photo.errors %}<div style="color: var(--accent-danger); font-size: 11px;">{{ form.profile_photo.errors.0 }}</div>{% endif %}
+      <label class="label">Profile Photo (For Certificate) *</label>
+      {{ form.profile_image }}
+      <div class="live-error" id="error-profile_image" style="color: var(--accent-danger); font-size: 12px; margin-top: 4px; display: none;"></div>
+      {% if form.profile_image.errors %}<div style="color: var(--accent-danger); font-size: 12px;">{{ form.profile_image.errors.0 }}</div>{% endif %}
+      <img id="profile_preview" style="display:none; width:100px; height:100px; object-fit:cover; border-radius:50%; margin-top:10px; border:2px solid var(--accent-primary);">
     </div>
 
     <div class="grid-2">
       <div class="form-group">
-        <label class="label">Password</label>
-        {{ form.password1 }}
-        {% if form.password1.errors %}<div style="color: var(--accent-danger); font-size: 11px;">{{ form.password1.errors.0 }}</div>{% endif %}
+        <label class="label">Password *</label>
+        <div style="position: relative;">
+          {{ form.password1 }}
+          <span class="toggle-password" onclick="togglePassword('id_password1', this)" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text-muted); font-size: 16px;">👁️</span>
+        </div>
+        <div class="live-error" id="error-password1" style="color: var(--accent-danger); font-size: 12px; margin-top: 4px; display: none;"></div>
+        <div id="password-checklist" style="font-size: 11px; margin-top: 8px; color: var(--text-muted); display: none;">
+            <div id="pw-len">❌ Min 8 characters</div>
+            <div id="pw-upper">❌ One uppercase letter</div>
+            <div id="pw-lower">❌ One lowercase letter</div>
+            <div id="pw-num">❌ One number</div>
+            <div id="pw-spec">❌ One special character</div>
+        </div>
+        {% if form.password1.errors %}<div style="color: var(--accent-danger); font-size: 12px;">{{ form.password1.errors.0 }}</div>{% endif %}
       </div>
       <div class="form-group">
-        <label class="label">Confirm Password</label>
-        {{ form.password2 }}
-        {% if form.password2.errors %}<div style="color: var(--accent-danger); font-size: 11px;">{{ form.password2.errors.0 }}</div>{% endif %}
+        <label class="label">Confirm Password *</label>
+        <div style="position: relative;">
+          {{ form.password2 }}
+          <span class="toggle-password" onclick="togglePassword('id_password2', this)" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text-muted); font-size: 16px;">👁️</span>
+        </div>
+        <div class="live-error" id="error-password2" style="color: var(--accent-danger); font-size: 12px; margin-top: 4px; display: none;"></div>
+        {% if form.password2.errors %}<div style="color: var(--accent-danger); font-size: 12px;">{{ form.password2.errors.0 }}</div>{% endif %}
       </div>
     </div>
 
-    <button type="submit" class="btn btn-primary" style="width: 100%; height: 48px; font-size: 16px; margin-top: 16px;">
+    <button type="submit" id="submitBtn" class="btn btn-primary" style="width: 100%; height: 48px; font-size: 16px; margin-top: 16px;" disabled>
       Create Account
     </button>
   </form>
@@ -90,4 +129,317 @@
     Already registered? <a href="{% url 'login' %}" style="font-weight: 700; color: var(--accent-primary);">Sign In</a>
   </div>
 </div>
+
+<script>
+function togglePassword(inputId, iconElement) {
+    var input = document.getElementById(inputId);
+    if (input.type === "password") {
+        input.type = "text";
+        iconElement.innerText = "🙈";
+    } else {
+        input.type = "password";
+        iconElement.innerText = "👁️";
+    }
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    const form = document.getElementById("studentRegistrationForm");
+    const submitBtn = document.getElementById("submitBtn");
+
+    // All form inputs
+    const inputs = {
+        username: document.getElementById("id_username"),
+        first_name: document.getElementById("id_first_name"),
+        last_name: document.getElementById("id_last_name"),
+        email: document.getElementById("id_email"),
+        institution: document.getElementById("id_institution"),
+        date_of_birth: document.getElementById("id_date_of_birth"),
+        phone_number: document.getElementById("id_phone_number"),
+        whatsapp_number: document.getElementById("id_whatsapp_number"),
+        profile_image: document.getElementById("id_profile_image"),
+        password1: document.getElementById("id_password1"),
+        password2: document.getElementById("id_password2")
+    };
+
+    let validity = {};
+    Object.keys(inputs).forEach(k => validity[k] = false);
+
+    // Helper: Show error
+    function showError(field, msg) {
+        let errDiv = document.getElementById("error-" + field);
+        let inputEl = inputs[field];
+        errDiv.textContent = msg;
+        errDiv.style.display = "block";
+        errDiv.style.color = "var(--accent-danger)";
+        inputEl.style.border = "2px solid var(--accent-danger)";
+        validity[field] = false;
+        checkFormValidity();
+    }
+
+    // Helper: Show success
+    function showSuccess(field, msg = "") {
+        let errDiv = document.getElementById("error-" + field);
+        let inputEl = inputs[field];
+        if (msg) {
+            errDiv.textContent = msg;
+            errDiv.style.display = "block";
+            errDiv.style.color = "#10b981"; // Green
+        } else {
+            errDiv.style.display = "none";
+        }
+        inputEl.style.border = "2px solid #10b981";
+        validity[field] = true;
+        checkFormValidity();
+    }
+
+    // Helper: Clear validation styles
+    function clearStyles(field) {
+        let errDiv = document.getElementById("error-" + field);
+        let inputEl = inputs[field];
+        errDiv.style.display = "none";
+        inputEl.style.border = "";
+        validity[field] = false;
+        checkFormValidity();
+    }
+
+    // Check if whole form is valid
+    function checkFormValidity() {
+        let allValid = Object.values(validity).every(v => v === true);
+        submitBtn.disabled = !allValid;
+        submitBtn.style.opacity = allValid ? "1" : "0.5";
+    }
+
+    // AJAX uniqueness check
+    let debounceTimer;
+    async function checkUnique(field, value) {
+        try {
+            let res = await fetch(`/api/validate-field/?field=${field}&value=${encodeURIComponent(value)}`);
+            let data = await res.json();
+            return data.exists;
+        } catch (e) {
+            console.error(e);
+            return false;
+        }
+    }
+
+    function doAjaxCheck(field, value, emptyMsg, duplicateMsg, availableMsg) {
+        if (!value) return showError(field, emptyMsg);
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(async () => {
+            let exists = await checkUnique(field, value);
+            if (exists) {
+                showError(field, duplicateMsg);
+            } else {
+                showSuccess(field, availableMsg);
+            }
+        }, 400);
+    }
+
+    // Field validations
+    function validateUsername() {
+        let val = inputs.username.value.trim().toLowerCase();
+        inputs.username.value = val;
+        if (!val) return showError('username', 'Username is required.');
+        if (!/^[a-z0-9_]{4,30}$/.test(val)) return showError('username', 'Must be 4-30 chars, lowercase, numbers, underscores only.');
+        doAjaxCheck('username', val, 'Username is required.', 'Username already exists.', 'Username available.');
+    }
+
+    function validateName(field, name) {
+        let val = inputs[field].value.replace(/\s+/g, ' ').trimStart();
+        inputs[field].value = val;
+        if (!val.trim()) return showError(field, `${name} is required.`);
+        if (!/^[a-zA-Z\s]{2,50}$/.test(val)) return showError(field, 'Must be 2-50 characters, letters only.');
+        showSuccess(field);
+    }
+
+    function validateEmail() {
+        let val = inputs.email.value.replace(/\s/g, '').toLowerCase();
+        inputs.email.value = val;
+        if (!val) return showError('email', 'Email Address is required.');
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) return showError('email', 'Invalid email format.');
+        doAjaxCheck('email', val, 'Email is required.', 'Email already registered.', 'Email available.');
+    }
+
+    function validateInstitution() {
+        let val = inputs.institution.value.replace(/\s+/g, ' ').trimStart();
+        inputs.institution.value = val;
+        if (!val.trim()) return showError('institution', 'Institution is required.');
+        if (val.length < 3 || val.length > 150) return showError('institution', 'Must be 3-150 characters.');
+        if (/^\d+$/.test(val)) return showError('institution', 'Cannot contain only numbers.');
+        showSuccess('institution');
+    }
+
+    function validateDOB() {
+        let val = inputs.date_of_birth.value;
+        if (!val) return showError('date_of_birth', 'Date of Birth is required.');
+        let dob = new Date(val);
+        let today = new Date();
+        if (dob > today) return showError('date_of_birth', 'Future dates are not allowed.');
+        let age = today.getFullYear() - dob.getFullYear();
+        let m = today.getMonth() - dob.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+            age--;
+        }
+        if (age < 10 || age > 100) return showError('date_of_birth', 'Student age must be between 10 and 100 years.');
+        showSuccess('date_of_birth');
+    }
+
+    function validatePhone() {
+        let val = inputs.phone_number.value.replace(/\D/g, '');
+        inputs.phone_number.value = val;
+        if (val.length !== 10) return showError('phone_number', 'Must be exactly 10 digits.');
+        doAjaxCheck('phone_number', val, 'Required.', 'Phone number already exists.', 'Available.');
+    }
+
+    function validateWhatsApp() {
+        let val = inputs.whatsapp_number.value.replace(/\D/g, '');
+        inputs.whatsapp_number.value = val;
+        if (val.length !== 10) return showError('whatsapp_number', 'Must be exactly 10 digits.');
+        showSuccess('whatsapp_number');
+    }
+
+    function validateProfileImage() {
+        let file = inputs.profile_image.files[0];
+        let preview = document.getElementById('profile_preview');
+        if (!file) {
+            preview.style.display = 'none';
+            return showError('profile_image', 'Profile Photo is required.');
+        }
+        let ext = file.name.split('.').pop().toLowerCase();
+        if (!['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
+            preview.style.display = 'none';
+            return showError('profile_image', 'Invalid image file. Accept JPG, JPEG, PNG, WEBP.');
+        }
+        if (file.size > 2 * 1024 * 1024) {
+            preview.style.display = 'none';
+            return showError('profile_image', 'Maximum file size: 2 MB.');
+        }
+        showSuccess('profile_image');
+        preview.src = URL.createObjectURL(file);
+        preview.style.display = 'block';
+    }
+
+    function validatePassword1() {
+        document.getElementById("password-checklist").style.display = "block";
+        let val = inputs.password1.value;
+        let cLen = val.length >= 8;
+        let cUp = /[A-Z]/.test(val);
+        let cLow = /[a-z]/.test(val);
+        let cNum = /[0-9]/.test(val);
+        let cSpec = /[^A-Za-z0-9]/.test(val);
+
+        document.getElementById("pw-len").innerHTML = cLen ? "✅ Min 8 characters" : "❌ Min 8 characters";
+        document.getElementById("pw-upper").innerHTML = cUp ? "✅ One uppercase letter" : "❌ One uppercase letter";
+        document.getElementById("pw-lower").innerHTML = cLow ? "✅ One lowercase letter" : "❌ One lowercase letter";
+        document.getElementById("pw-num").innerHTML = cNum ? "✅ One number" : "❌ One number";
+        document.getElementById("pw-spec").innerHTML = cSpec ? "✅ One special character" : "❌ One special character";
+        document.getElementById("pw-len").style.color = cLen ? "#10b981" : "var(--accent-danger)";
+        document.getElementById("pw-upper").style.color = cUp ? "#10b981" : "var(--accent-danger)";
+        document.getElementById("pw-lower").style.color = cLow ? "#10b981" : "var(--accent-danger)";
+        document.getElementById("pw-num").style.color = cNum ? "#10b981" : "var(--accent-danger)";
+        document.getElementById("pw-spec").style.color = cSpec ? "#10b981" : "var(--accent-danger)";
+
+        if (cLen && cUp && cLow && cNum && cSpec && val.length <= 128) {
+            showSuccess('password1');
+        } else {
+            showError('password1', 'Password does not meet complexity requirements.');
+        }
+        
+        // Re-validate password 2 if it has value
+        if (inputs.password2.value) validatePassword2();
+    }
+
+    function validatePassword2() {
+        let p1 = inputs.password1.value;
+        let p2 = inputs.password2.value;
+        if (!p2) return showError('password2', 'Please confirm password.');
+        if (p1 !== p2) return showError('password2', 'Passwords do not match.');
+        showSuccess('password2');
+    }
+
+    // Attach events
+    inputs.username.addEventListener('input', validateUsername);
+    inputs.username.addEventListener('blur', validateUsername);
+
+    inputs.first_name.addEventListener('input', () => validateName('first_name', 'First Name'));
+    inputs.first_name.addEventListener('blur', () => validateName('first_name', 'First Name'));
+
+    inputs.last_name.addEventListener('input', () => validateName('last_name', 'Last Name'));
+    inputs.last_name.addEventListener('blur', () => validateName('last_name', 'Last Name'));
+
+    inputs.email.addEventListener('input', validateEmail);
+    inputs.email.addEventListener('blur', validateEmail);
+
+    inputs.institution.addEventListener('input', validateInstitution);
+    inputs.institution.addEventListener('blur', validateInstitution);
+
+
+
+    inputs.date_of_birth.addEventListener('change', validateDOB);
+    inputs.date_of_birth.addEventListener('blur', validateDOB);
+
+    inputs.phone_number.addEventListener('input', function() {
+        validatePhone();
+        let sameAsPhone = document.getElementById('same_as_phone');
+        if (sameAsPhone && sameAsPhone.checked) {
+            inputs.whatsapp_number.value = inputs.phone_number.value;
+            validateWhatsApp();
+        }
+    });
+    inputs.phone_number.addEventListener('blur', validatePhone);
+
+    const sameAsPhoneCheckbox = document.getElementById('same_as_phone');
+    if (sameAsPhoneCheckbox) {
+        sameAsPhoneCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                inputs.whatsapp_number.value = inputs.phone_number.value;
+                validateWhatsApp();
+            } else {
+                inputs.whatsapp_number.value = '';
+                validateWhatsApp();
+            }
+        });
+    }
+
+    inputs.whatsapp_number.addEventListener('input', function() {
+        if (sameAsPhoneCheckbox) sameAsPhoneCheckbox.checked = false;
+        validateWhatsApp();
+    });
+    inputs.whatsapp_number.addEventListener('blur', validateWhatsApp);
+
+    inputs.profile_image.addEventListener('change', validateProfileImage);
+
+    inputs.password1.addEventListener('input', validatePassword1);
+    inputs.password1.addEventListener('blur', validatePassword1);
+
+    inputs.password2.addEventListener('input', validatePassword2);
+    inputs.password2.addEventListener('blur', validatePassword2);
+
+    // Form submit validation
+    form.addEventListener('submit', function(e) {
+        let allValid = Object.values(validity).every(v => v === true);
+        if (!allValid) {
+            e.preventDefault();
+            // Show password checklist if form is submitted while invalid
+            document.getElementById("password-checklist").style.display = "block";
+            // Find first invalid and focus
+            for (const [key, value] of Object.entries(validity)) {
+                if (!value) {
+                    inputs[key].focus();
+                    inputs[key].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    break;
+                }
+            }
+            return;
+        }
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span style="display:inline-block; width:16px; height:16px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 1s linear infinite; vertical-align:middle; margin-right:8px;"></span> Processing...';
+    });
+
+    // Add CSS for spinner
+    const style = document.createElement('style');
+    style.innerHTML = `@keyframes spin { 100% { transform: rotate(360deg); } }`;
+    document.head.appendChild(style);
+});
+</script>
 {% endblock %}

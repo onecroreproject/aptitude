@@ -90,11 +90,11 @@ class CustomUser(AbstractUser):
         ],
         help_text='Primary contact number.',
     )
-    profile_photo = models.ImageField(
-        upload_to='profile_photos/%Y/%m/',
+    profile_image = models.ImageField(
+        upload_to='profile_images/',
         blank=True,
         null=True,
-        help_text='Student profile picture.',
+        help_text='User profile picture.',
     )
     date_of_birth = models.DateField(
         blank=True,
@@ -106,9 +106,23 @@ class CustomUser(AbstractUser):
         help_text='Full postal address.',
     )
     institution = models.CharField(
-        max_length=200,
+        max_length=150,
         blank=True,
-        help_text='School / college / university name.',
+        help_text='College or institution name.',
+    )
+    admission_number = models.CharField(
+        max_length=30,
+        blank=True,
+        null=True,
+        unique=True,
+        help_text='Unique admission number.',
+    )
+    roll_number = models.CharField(
+        max_length=30,
+        blank=True,
+        null=True,
+        unique=True,
+        help_text='Unique roll number.',
     )
 
     @property
@@ -168,30 +182,30 @@ class CustomUser(AbstractUser):
 # ──────────────────────────────────────────────
 
 @receiver(pre_save, sender=CustomUser)
-def _delete_old_profile_photo(sender, instance, **kwargs):
-    """When profile_photo is replaced, remove the previous file from disk."""
+def _delete_old_profile_image(sender, instance, **kwargs):
+    """When profile_image is replaced, remove the previous file from disk."""
     if not instance.pk:
         return  # new user, nothing to compare
     try:
         old_instance = sender.objects.get(pk=instance.pk)
     except sender.DoesNotExist:
         return
-    old_photo = old_instance.profile_photo
-    new_photo = instance.profile_photo
-    if old_photo and old_photo != new_photo:
+    old_image = old_instance.profile_image
+    new_image = instance.profile_image
+    if old_image and old_image != new_image:
         try:
-            old_photo.delete(save=False)
+            old_image.delete(save=False)
         except Exception:
             # Never block the save just because the old file is missing.
             pass
 
 
 @receiver(post_delete, sender=CustomUser)
-def _delete_profile_photo_on_user_delete(sender, instance, **kwargs):
-    """Remove the photo from disk when the user record is deleted."""
-    if instance.profile_photo:
+def _delete_profile_image_on_user_delete(sender, instance, **kwargs):
+    """Remove the image from disk when the user record is deleted."""
+    if instance.profile_image:
         try:
-            instance.profile_photo.delete(save=False)
+            instance.profile_image.delete(save=False)
         except Exception:
             pass
 
@@ -898,23 +912,37 @@ class ExamRequest(models.Model):
         Mark request as approved and trigger notification.
         Paper generation should be handled by the calling view.
         """
+        if self.status != self.Status.PENDING:
+            return
+
         self.status = self.Status.APPROVED
         self.reviewed_at = timezone.now()
         self.reviewed_by = admin_user
         self.save(update_fields=['status', 'reviewed_at', 'reviewed_by'])
 
         # Create approval notification
-        Notification.objects.create(
+        # Check to prevent duplicate notification in a short timeframe
+        recent_notif = Notification.objects.filter(
             recipient=self.student,
             notification_type=Notification.NotificationType.APPROVAL,
             title='Exam Request Approved',
-            message=f'Your exam request has been approved. You may now take your exam.',
-        )
+            created_at__gte=timezone.now() - timezone.timedelta(minutes=1)
+        ).exists()
+        if not recent_notif:
+            Notification.objects.create(
+                recipient=self.student,
+                notification_type=Notification.NotificationType.APPROVAL,
+                title='Exam Request Approved',
+                message=f'Your exam request has been approved. You may now take your exam.',
+            )
 
     def reject(self, admin_user, reason=''):
         """
         Mark request as rejected with a reason and trigger notification.
         """
+        if self.status != self.Status.PENDING:
+            return
+
         self.status = self.Status.REJECTED
         self.rejection_reason = reason
         self.reviewed_at = timezone.now()
@@ -922,12 +950,19 @@ class ExamRequest(models.Model):
         self.save(update_fields=['status', 'rejection_reason', 'reviewed_at', 'reviewed_by'])
 
         # Create rejection notification
-        Notification.objects.create(
+        recent_notif = Notification.objects.filter(
             recipient=self.student,
             notification_type=Notification.NotificationType.REJECTION,
             title='Exam Request Rejected',
-            message=f'Better luck next time. Your request for {self.category.name} was rejected. Reason: {reason}' if reason else f'Better luck next time. Your request for {self.category.name} was rejected.',
-        )
+            created_at__gte=timezone.now() - timezone.timedelta(minutes=1)
+        ).exists()
+        if not recent_notif:
+            Notification.objects.create(
+                recipient=self.student,
+                notification_type=Notification.NotificationType.REJECTION,
+                title='Exam Request Rejected',
+                message=f'Better luck next time. Your request for {self.category.name} was rejected. Reason: {reason}' if reason else f'Better luck next time. Your request for {self.category.name} was rejected.',
+            )
 
     def clean(self):
         super().clean()
