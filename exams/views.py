@@ -646,10 +646,16 @@ class TakeExamView(StudentRequiredMixin, View):
         )
 
         questions = paper.paper_questions.select_related('question').order_by('order')
+        
+        # Pre-fetch existing answers for this exam attempt
+        existing_answers = StudentAnswer.objects.filter(result=result)
+        answers_dict = {str(ans.question.id): ans.student_answer for ans in existing_answers}
+
         response = render(request, 'exams/student/take_exam.html', {
             'paper': paper,
             'questions': questions,
             'result': result,
+            'answers_dict': answers_dict,
         })
         # Prevent caching test questions
         response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
@@ -668,19 +674,14 @@ class TakeExamView(StudentRequiredMixin, View):
 
         # Save all answers
         questions = paper.paper_questions.select_related('question').order_by('order')
-        answers_to_create = []
         for pq in questions:
             answer_text = request.POST.get(f'answer_{pq.question.id}', '').strip()
-            answers_to_create.append(
-                StudentAnswer(
+            if answer_text:
+                StudentAnswer.objects.update_or_create(
                     result=result,
                     question=pq.question,
-                    student_answer=answer_text,
+                    defaults={'student_answer': answer_text}
                 )
-            )
-
-        if answers_to_create:
-            StudentAnswer.objects.bulk_create(answers_to_create, ignore_conflicts=True)
 
         # Submit and auto-evaluate
         result.submitted_at = timezone.now()
@@ -690,6 +691,35 @@ class TakeExamView(StudentRequiredMixin, View):
 
         messages.success(request, 'Test Completed! Your responses have been submitted.')
         return redirect('exam_complete')
+
+
+class AutoSaveAnswerView(StudentRequiredMixin, View):
+    """AJAX endpoint to auto-save exam answers seamlessly."""
+    
+    def post(self, request, paper_id):
+        paper = get_object_or_404(ExamPaper, id=paper_id, student=request.user)
+        result = get_object_or_404(
+            StudentExamResult,
+            exam_paper=paper,
+            student=request.user,
+            status=StudentExamResult.Status.IN_PROGRESS,
+        )
+        try:
+            data = json.loads(request.body)
+            question_id = data.get('question_id')
+            answer_text = data.get('answer_text', '')
+            
+            if question_id:
+                question = get_object_or_404(Question, id=question_id)
+                StudentAnswer.objects.update_or_create(
+                    result=result,
+                    question=question,
+                    defaults={'student_answer': answer_text}
+                )
+                return JsonResponse({'status': 'success'})
+            return JsonResponse({'status': 'error', 'message': 'Missing question_id'}, status=400)
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
 
 class ExamCompleteView(StudentRequiredMixin, TemplateView):
