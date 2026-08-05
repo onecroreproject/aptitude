@@ -24,6 +24,7 @@ urlpatterns = [
     path('student/categories/', views.StudentCategoriesView.as_view(), name='student_categories'),
     path('student/request-exam/', views.RequestExamView.as_view(), name='request_exam'),
     path('student/exam/<uuid:paper_id>/', views.TakeExamView.as_view(), name='take_exam'),
+    path('student/exam/<uuid:paper_id>/auto-save/', views.AutoSaveAnswerView.as_view(), name='auto_save_answer'),
     path('student/exam-complete/', views.ExamCompleteView.as_view(), name='exam_complete'),
     path('student/history/', views.StudentHistoryView.as_view(), name='student_history'),
     path('student/notifications/', views.StudentNotificationsView.as_view(), name='student_notifications'),
