@@ -18,49 +18,10 @@
     <div class="stat-label">📝 Exams Taken</div>
     <div class="stat-value">{{ total_exams }}</div>
   </div>
-  <div class="stat-box">
-    <div class="stat-label">⚖️ Pending Requests</div>
-    <div class="stat-value">{{ pending_requests|default:0 }}</div>
-  </div>
   <div class="stat-box" onclick="location.href='{% url 'admin_never_attended_students' %}'" style="cursor: pointer; position: relative; overflow: hidden; transition: all 0.3s ease; border: 1.5px dashed var(--accent-warning);">
     <div class="stat-label">🚫 Never Attended</div>
     <div class="stat-value">{{ never_attended_count }}</div>
     <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px; font-weight: 600;">Click to view list →</div>
-  </div>
-</div>
-
-<div style="margin-top: 32px;">
-  
-  <!-- Recent Exam Requests -->
-  <div class="card">
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
-      <div class="card-title">Recent Exam Requests</div>
-      <a href="{% url 'admin_exam_requests' %}" class="btn btn-outline btn-sm">View All</a>
-    </div>
-    <div class="table-container">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Student</th>
-            <th>Category</th>
-            <th>Status</th>
-            <th>Date</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for req in recent_requests %}
-            <tr>
-              <td style="font-weight: 700;">{{ req.student.username }}</td>
-              <td>{{ req.category.name }}</td>
-              <td><span class="badge badge-{{ req.status|lower }}">{{ req.status }}</span></td>
-              <td style="font-size: 12px; font-weight: 500;">{{ req.requested_at|date:"M d, Y" }}</td>
-            </tr>
-          {% empty %}
-            <tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 32px;">No recent requests.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
   </div>
 </div>
 

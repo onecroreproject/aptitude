@@ -432,10 +432,11 @@ class CategoryForm(forms.ModelForm):
 
     class Meta:
         model = Category
-        fields = ['name', 'description']
+        fields = ['name', 'description', 'pass_mark']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Category Name (e.g. Python)'}),
             'description': forms.Textarea(attrs={'class': 'form-input', 'rows': 3, 'placeholder': 'Optional description...'}),
+            'pass_mark': forms.NumberInput(attrs={'class': 'form-input', 'step': '0.01', 'min': '0', 'max': '100', 'placeholder': 'Pass Mark (e.g. 35)'}),
         }
 
 

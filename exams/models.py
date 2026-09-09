@@ -20,6 +20,7 @@ Design Principles:
 """
 
 import uuid
+from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
@@ -210,6 +211,69 @@ def _delete_profile_image_on_user_delete(sender, instance, **kwargs):
             pass
 
 
+def can_start_exam(student, category):
+    """Return the eligibility state for a student to start or resume an exam."""
+    if not student or not category:
+        return {'allowed': False, 'reason': 'invalid', 'message': 'Invalid student or category.'}
+
+    if not getattr(student, 'is_authenticated', False):
+        return {'allowed': False, 'reason': 'auth', 'message': 'Authentication required.'}
+
+    if getattr(student, 'role', None) != CustomUser.Role.STUDENT:
+        return {'allowed': False, 'reason': 'role', 'message': 'Only students can start exams.'}
+
+    active_attempt = StudentExamResult.objects.filter(
+        student=student,
+        exam_paper__category=category,
+        status=StudentExamResult.Status.IN_PROGRESS,
+    ).select_related('exam_paper').order_by('-started_at').first()
+    if active_attempt:
+        return {
+            'allowed': True,
+            'reason': 'resume',
+            'message': 'An active attempt already exists.',
+            'paper_id': active_attempt.exam_paper_id,
+            'resume': True,
+        }
+
+    last_attempt = StudentExamResult.objects.filter(
+        student=student,
+        exam_paper__category=category,
+        status__in=[StudentExamResult.Status.SUBMITTED, StudentExamResult.Status.EVALUATED],
+    ).select_related('exam_paper__category').order_by('-completed_at', '-submitted_at', '-started_at').first()
+
+    if last_attempt is None:
+        return {'allowed': True, 'reason': 'new', 'message': 'No previous attempt found.', 'resume': False}
+
+    if last_attempt.status == StudentExamResult.Status.EVALUATED and last_attempt.is_passed():
+        return {
+            'allowed': False,
+            'reason': 'passed',
+            'message': 'This exam is already passed.',
+            'resume': False,
+        }
+
+    completion_time = last_attempt.completed_at or last_attempt.submitted_at
+    if not completion_time:
+        return {'allowed': True, 'reason': 'new', 'message': 'Previous attempt has no completion timestamp.', 'resume': False}
+
+    if last_attempt.status == StudentExamResult.Status.EVALUATED and not last_attempt.is_passed():
+        next_attempt_at = completion_time + timedelta(hours=24)
+        now = timezone.now()
+        if now >= next_attempt_at:
+            return {'allowed': True, 'reason': 'retry', 'message': 'Cooldown expired.', 'resume': False}
+        return {
+            'allowed': False,
+            'reason': 'cooldown',
+            'message': 'Re-exam is still in cooldown.',
+            'resume': False,
+            'cooldown_remaining': next_attempt_at - now,
+            'next_attempt_at': next_attempt_at,
+        }
+
+    return {'allowed': True, 'reason': 'new', 'message': 'Attempt may start.', 'resume': False}
+
+
 class OTP(models.Model):
     """
     Temporary one-time password for password reset workflow.
@@ -265,6 +329,13 @@ class Category(models.Model):
     description = models.TextField(
         blank=True,
         help_text='Brief overview of what this category covers.'
+    )
+    pass_mark = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=35.00,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text='Students must score above this percentage to pass and receive a certificate.'
     )
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     is_active = models.BooleanField(
@@ -716,9 +787,12 @@ class StudentExamResult(models.Model):
             (float(self.total_marks_obtained) / self.total_marks_possible) * 100, 2
         )
 
-    def is_passed(self, pass_percentage=85):
-        """Check pass/fail against a configurable threshold."""
-        return self.percentage() >= pass_percentage
+    def is_passed(self):
+        """Check pass/fail against a configurable threshold from the category."""
+        pct = self.percentage()
+        if pct == 100:
+            return True
+        return pct > self.exam_paper.category.pass_mark
 
     def status_display(self):
         """Human-readable status (custom method per spec)."""
@@ -757,7 +831,7 @@ class StudentExamResult(models.Model):
             'total_marks_obtained', 'total_marks_possible',
             'status', 'completed_at',
         ])
-        if self.percentage() >= 85:
+        if self.is_passed():
             from .utils import generate_and_send_certificate
             try:
                 generate_and_send_certificate(self)

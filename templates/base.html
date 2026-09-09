@@ -46,8 +46,6 @@
           class="nav-link {% if 'category' in request.resolver_match.url_name %}active{% endif %}">📁 Categories</a>
         <a href="{% url 'admin_students' %}"
           class="nav-link {% if 'student' in request.resolver_match.url_name %}active{% endif %}">👥 Students</a>
-        <a href="{% url 'admin_exam_requests' %}"
-          class="nav-link {% if 'request' in request.resolver_match.url_name %}active{% endif %}">⚖️ Requests</a>
         <a href="{% url 'admin_results' %}"
           class="nav-link {% if 'result' in request.resolver_match.url_name %}active{% endif %}">🏅 Results</a>
         {% if user.is_superuser %}
@@ -74,17 +72,24 @@
         
       </div>
     </div>
-    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
     {% endif %}
 
     <!-- ── Main Area ── -->
     <div class="main-content">
 
       {% if user.is_authenticated %}
+      <style>
+        @media (max-width: 768px) {
+          .user-info-text {
+            display: none !important;
+          }
+        }
+      </style>
       <header class="header">
         <div class="mobile-toggle" onclick="toggleSidebar()">☰</div>
 
-        <h1 style="font-size: 18px; font-weight: 700; color: var(--text-primary);">
+        <h1 style="font-size: 18px; font-weight: 700; color: var(--text-primary); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 12px;">
           {% block page_title %}Dashboard{% endblock %}
         </h1>
 

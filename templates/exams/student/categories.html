@@ -18,33 +18,39 @@
         {% elif 'Math' in category.name %}📐
         {% else %}📚{% endif %}
       </div>
-      
+
       <h3 style="margin-bottom: 8px; color: var(--text-primary);">{{ category.name }}</h3>
       <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 20px;">
         {{ category.description|default:"No description available for this category." }}
       </p>
-      
+
       <div style="display: flex; align-items: center; justify-content: space-between; margin-top: auto;">
         <span style="font-size: 12px; font-weight: 700; color: var(--text-muted);">
-          {{ category.q_count|default:0 }} QUESTIONS
+          {{ category.actual_question_count|default:0 }} QUESTIONS
         </span>
-        
-        {% if category.id in pending_cat_ids %}
-          <span class="badge badge-pending">PENDING APPROVAL</span>
-        {% else %}
-          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            {% if category.paper_id %}
-                <a href="{% url 'take_exam' category.paper_id %}" class="btn btn-success" style="flex: 1;">Start Exam</a>
-            {% else %}
-              <form action="{% url 'request_exam' %}" method="POST" style="flex: 1; display: flex;">
-                {% csrf_token %}
-                <input type="hidden" name="category" value="{{ category.id }}">
-                <button type="submit" class="btn {% if category.id in failed_cat_ids %}btn-warning{% elif category.id in completed_cat_ids %}btn-ghost{% else %}btn-primary{% endif %}" style="width: 100%;">
-                  {% if category.id in completed_cat_ids or category.id in failed_cat_ids %}Request Retest{% else %}Request Exam{% endif %}
-                </button>
-              </form>
+
+        {% if category.eligibility.reason == 'cooldown' %}
+          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+            <span style="font-size: 11px; color: var(--text-muted);">Re-exam available in: {{ category.cooldown_remaining|default:'00:00' }}</span>
+            <button type="button" class="btn btn-warning" disabled style="opacity: 0.7;">Re-Exam</button>
+          </div>
+        {% elif category.is_active_attempt %}
+          <form method="post" action="{% url 'start_exam' category.id %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-success">Continue Exam</button>
+          </form>
+        {% elif category.eligibility.reason == 'passed' %}
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span class="badge badge-approved" style="text-transform: uppercase;">Passed</span>
+            {% if category.certificate_id %}
+              <a href="{% url 'preview_certificate' %}?result_id={{ category.certificate_id }}" target="_blank" class="btn btn-primary" style="padding: 6px 16px; font-size: 13px; font-weight: 700; text-decoration: none;">Get Certificate</a>
             {% endif %}
           </div>
+        {% else %}
+          <form method="post" action="{% url 'start_exam' category.id %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary">Start Exam</button>
+          </form>
         {% endif %}
       </div>
     </div>

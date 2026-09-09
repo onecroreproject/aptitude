@@ -50,7 +50,7 @@
               </td>
               <td style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">{{ category.description|truncatewords:10 }}</td>
               <td style="text-align: center;">
-                <span class="badge badge-approved" style="padding: 4px 10px; border-radius: 20px;" title="Total Questions">{{ category.q_count }}</span>
+                <span class="badge badge-approved" style="padding: 4px 10px; border-radius: 20px;" title="Total Questions">{{ category.actual_question_count|default:0 }}</span>
               </td>
               <td style="font-size: 12px; font-weight: 500; color: var(--text-muted);">{{ category.created_at|date:"M d, Y" }}</td>
               <td>

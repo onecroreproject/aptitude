@@ -13,6 +13,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.mail import send_mail
 from django.conf import settings
+from django.db import transaction
 from django.db.models import Avg, Count, Sum, Q, F
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
@@ -27,9 +28,7 @@ from .forms import (
     AdminProfileForm,
     CategoryForm,
     QuestionForm,
-    ExamRequestForm,
     ExcelImportForm,
-    ExamRequestReviewForm,
     ForgotPasswordForm,
     OTPVerificationForm,
     ResetPasswordForm,
@@ -49,6 +48,7 @@ from .models import (
     OTP,
     SubAdminOTP,
     Certificate,
+    can_start_exam,
 )
 from .utils import import_questions_from_excel, generate_exam_paper, submit_and_evaluate
 
@@ -430,46 +430,34 @@ def dashboard_redirect(request):
 # ════════════════════════════════════════════════
 
 class StudentDashboardView(StudentRequiredMixin, TemplateView):
-    """Student home page — shows exam status, notifications, request CTA."""
+    """Student home page — shows available and completed exams without approval requests."""
     template_name = 'exams/student/dashboard.html'
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         user = self.request.user
 
-        # Exam requests
-        ctx['pending_requests'] = ExamRequest.objects.filter(
-            student=user, status='Pending'
-        ).count()
-        ctx['approved_requests'] = ExamRequest.objects.filter(
-            student=user, status='Approved'
-        )
-        ctx['recent_requests'] = ExamRequest.objects.filter(
-            student=user
-        ).order_by('-requested_at')[:5]
+        available_categories = []
+        for category in Category.objects.filter(is_active=True).order_by('name'):
+            eligibility = can_start_exam(user, category)
+            if eligibility['allowed']:
+                available_categories.append(category)
+        ctx['available_exams'] = available_categories
 
-        # Active exams (approved but not yet taken)
-        taken_paper_ids = StudentExamResult.objects.filter(
-            student=user
-        ).values_list('exam_paper_id', flat=True)
-        ctx['available_exams'] = ExamPaper.objects.filter(
-            student=user,
-            category__is_active=True
-        ).exclude(id__in=taken_paper_ids)
-
-        # Completed exams count (students see only "Test Completed")
         ctx['completed_exams'] = StudentExamResult.objects.filter(
-            student=user, status__in=['Submitted', 'Evaluated']
+            student=user,
+            status__in=[StudentExamResult.Status.SUBMITTED, StudentExamResult.Status.EVALUATED]
         ).count()
 
-        # Unread notifications
+        ctx['latest_results'] = StudentExamResult.objects.filter(
+            student=user,
+            status=StudentExamResult.Status.EVALUATED,
+        ).select_related('exam_paper__category').order_by('-completed_at')[:5]
+
         ctx['unread_count'] = Notification.unread_count(user) or 0
         ctx['notifications'] = Notification.objects.filter(
             recipient=user
         ).order_by('-created_at')[:10]
-
-        # Active categories for the request modal
-        ctx['active_categories'] = Category.objects.filter(is_active=True).order_by('name')
 
         return ctx
 
@@ -528,95 +516,113 @@ class SubAdminProfileView(BaseAdminRequiredMixin, View):
         return render(request, 'exams/subadmin/profile.html', {'form': form})
 
 
-class RequestExamView(StudentRequiredMixin, View):
-    """Student submits an exam access request for a specific category."""
+class StartExamView(StudentRequiredMixin, View):
+    """Begin a direct exam start or resume an in-progress attempt without approval."""
 
-    def post(self, request):
-        form = ExamRequestForm(request.POST)
-        if form.is_valid():
-            category = form.cleaned_data['category']
-            user = request.user
-            
-            # 1. Block if there is already a Pending request for this category
-            if ExamRequest.objects.filter(student=user, category=category, status='Pending').exists():
-                messages.warning(request, f'You already have a pending request for {category.name}.')
-                return redirect('student_dashboard')
+    def post(self, request, category_id):
+        category = get_object_or_404(Category, id=category_id, is_active=True)
+        eligibility = can_start_exam(request.user, category)
 
-            # 2. If they have an Approved request but no result yet (Unattended)
-            # We still allow a re-request if they feel they need a new approval/paper
-            # per user requirement: "must again send a request"
+        if not eligibility['allowed']:
+            if eligibility['reason'] == 'cooldown':
+                remaining = eligibility['cooldown_remaining']
+                hours, remainder = divmod(int(remaining.total_seconds()), 3600)
+                minutes, _ = divmod(remainder, 60)
+                messages.warning(
+                    request,
+                    f'You must wait {hours}h {minutes}m before re-taking {category.name}.',
+                )
+            elif eligibility['reason'] == 'passed':
+                messages.info(request, f'You have already passed {category.name}.')
+            else:
+                messages.warning(request, eligibility['message'])
+            return redirect('student_categories')
 
-            # 3. Check if they have already passed — per spec, re-exam is for those who "do not pass"
-            # But the user also mentions "does not attend".
-            last_result = StudentExamResult.objects.filter(
-                student=user, exam_paper__category=category
-            ).order_by('-submitted_at').first()
-            
-            if last_result and last_result.status == 'Evaluated' and last_result.is_passed():
-                # They passed already. Still allow? User's "does not pass" implies failure.
-                # I'll allow but show a specific info message.
-                pass 
-                
-            ExamRequest.objects.create(
-                student=user,
-                category=category
-            )
-            messages.success(request, f'Request for {category.name} submitted! Please wait for admin approval.')
-        else:
-            messages.error(request, 'Please select a valid category.')
-            
-        return redirect('student_dashboard')
+        if eligibility.get('resume') and eligibility.get('paper_id'):
+            return redirect('take_exam', paper_id=eligibility['paper_id'])
+
+        active_attempt = StudentExamResult.objects.filter(
+            student=request.user,
+            exam_paper__category=category,
+            status=StudentExamResult.Status.IN_PROGRESS,
+        ).select_related('exam_paper').order_by('-started_at').first()
+        if active_attempt:
+            return redirect('take_exam', paper_id=active_attempt.exam_paper_id)
+
+        try:
+            with transaction.atomic():
+                existing = StudentExamResult.objects.filter(
+                    student=request.user,
+                    exam_paper__category=category,
+                    status=StudentExamResult.Status.IN_PROGRESS,
+                ).select_for_update().first()
+                if existing:
+                    return redirect('take_exam', paper_id=existing.exam_paper_id)
+
+                paper = generate_exam_paper(request.user, category)
+                result = StudentExamResult.objects.create(
+                    student=request.user,
+                    exam_paper=paper,
+                    total_marks_possible=paper.total_marks,
+                    status=StudentExamResult.Status.IN_PROGRESS,
+                )
+                messages.success(request, f'{category.name} exam started successfully.')
+                return redirect('take_exam', paper_id=paper.id)
+        except ValueError as exc:
+            messages.error(request, str(exc))
+            return redirect('student_categories')
 
 
 class StudentCategoriesView(StudentRequiredMixin, ListView):
-    """List all categories for students with contextual actions (Request/Retest/Start)."""
+    """List all categories with direct access states based on attempt history."""
     template_name = 'exams/student/categories.html'
     context_object_name = 'categories'
-    
+
     def get_queryset(self):
         return Category.objects.filter(is_active=True).annotate(
-            q_count=Count('questions', filter=Q(questions__is_active=True))
+            actual_question_count=Count(
+                'questions',
+                filter=Q(questions__is_active=True),
+                distinct=True,
+            )
         ).order_by('name')
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         user = self.request.user
-        
-        # Pending requests
-        ctx['pending_cat_ids'] = list(ExamRequest.objects.filter(
-            student=user, status='Pending'
-        ).values_list('category_id', flat=True))
-        
-        # Approved but not taken (Access Granted)
-        # We define "not taken" as having an active paper without a submitted result
-        untaken_papers = ExamPaper.objects.filter(
-            student=user
-        ).exclude(
-            result__status__in=['Submitted', 'Evaluated']
-        ).values('category_id', 'id')
-        
-        # Build a map for easy lookup
-        paper_map = {p['category_id']: p['id'] for p in untaken_papers}
 
-        # Inject paper_id into categories for the template
         for cat in ctx['categories']:
-            cat.paper_id = paper_map.get(cat.id)
-        
-        # Categories already attempted (to show "Retest" vs "Request")
-        completed_cat_ids = StudentExamResult.objects.filter(
-            student=user,
-            status__in=['Submitted', 'Evaluated']
-        ).values_list('exam_paper__category_id', flat=True).distinct()
-        ctx['completed_cat_ids'] = list(completed_cat_ids)
-        
-        # Identify failed categories explicitly
-        # This is a bit complex in one line, so we do it in a loop or filtered list
-        results = StudentExamResult.objects.filter(student=user, status='Evaluated')
-        failed_cat_ids = []
-        for r in results:
-            if not r.is_passed():
-                failed_cat_ids.append(r.exam_paper.category_id)
-        ctx['failed_cat_ids'] = list(set(failed_cat_ids))
+            cat.eligibility = can_start_exam(user, cat)
+            cat.is_active_attempt = bool(
+                StudentExamResult.objects.filter(
+                    student=user,
+                    exam_paper__category=cat,
+                    status=StudentExamResult.Status.IN_PROGRESS,
+                ).exists()
+            )
+            cat.active_paper_id = (
+                StudentExamResult.objects.filter(
+                    student=user,
+                    exam_paper__category=cat,
+                    status=StudentExamResult.Status.IN_PROGRESS,
+                ).values_list('exam_paper_id', flat=True).first()
+            )
+            cat.cooldown_remaining = None
+            if cat.eligibility.get('reason') == 'cooldown':
+                cat.cooldown_remaining = cat.eligibility.get('cooldown_remaining')
+                
+            if cat.eligibility.get('reason') == 'passed':
+                cert = Certificate.objects.filter(student=user, category=cat).first()
+                if cert:
+                    cat.certificate_id = cert.id
+                else:
+                    passed_result = StudentExamResult.objects.filter(
+                        student=user,
+                        exam_paper__category=cat,
+                        status=StudentExamResult.Status.EVALUATED
+                    ).order_by('-completed_at').first()
+                    if passed_result and passed_result.is_passed:
+                        cat.certificate_id = passed_result.id
 
         return ctx
 
@@ -627,15 +633,24 @@ class TakeExamView(StudentRequiredMixin, View):
     def get(self, request, paper_id):
         paper = get_object_or_404(ExamPaper, id=paper_id, student=request.user)
 
-        # Check if already submitted or evaluated
+        eligibility = can_start_exam(request.user, paper.category)
+        if not eligibility['allowed'] and eligibility['reason'] != 'resume':
+            if eligibility['reason'] == 'cooldown':
+                remaining = eligibility['cooldown_remaining']
+                hours, remainder = divmod(int(remaining.total_seconds()), 3600)
+                minutes, _ = divmod(remainder, 60)
+                messages.warning(request, f'You must wait {hours}h {minutes}m before re-taking {paper.category.name}.')
+            else:
+                messages.warning(request, eligibility['message'])
+            return redirect('student_categories')
+
         if StudentExamResult.objects.filter(
-            exam_paper=paper, 
+            exam_paper=paper,
             status__in=[StudentExamResult.Status.SUBMITTED, StudentExamResult.Status.EVALUATED]
         ).exists():
             messages.warning(request, 'You have already completed this exam.')
             return redirect('student_dashboard')
 
-        # Create result record (In Progress)
         result, created = StudentExamResult.objects.get_or_create(
             student=request.user,
             exam_paper=paper,
@@ -967,17 +982,11 @@ class AdminDashboardView(BaseAdminRequiredMixin, TemplateView):
         ctx['total_students'] = CustomUser.objects.filter(role='Student').count()
         ctx['total_questions'] = Question.objects.filter(is_active=True).count()
         ctx['total_exams'] = StudentExamResult.objects.count()
-        ctx['pending_requests'] = ExamRequest.objects.filter(status='Pending').count()
 
         # Students who registered but never attended exam
         attended_student_ids = StudentExamResult.objects.values_list('student_id', flat=True).distinct()
         ctx['never_attended_count'] = CustomUser.objects.filter(role='Student').exclude(id__in=attended_student_ids).count()
         ctx['attended_count'] = len(attended_student_ids)
-
-        # Recent requests
-        ctx['recent_requests'] = ExamRequest.objects.select_related(
-            'student'
-        ).order_by('-requested_at')[:5]
 
         # Recent results
         ctx['recent_results'] = StudentExamResult.objects.select_related(
@@ -1085,11 +1094,6 @@ class AdminStudentDetailView(BaseAdminRequiredMixin, DetailView):
         ctx['exam_results'] = StudentExamResult.objects.filter(
             student=student
         ).select_related('exam_paper', 'exam_paper__category').order_by('-started_at')
-
-        # Request history
-        ctx['exam_requests'] = ExamRequest.objects.filter(
-            student=student
-        ).order_by('-requested_at')
 
         # Certificate stats
         ctx['certificates'] = Certificate.objects.filter(student=student).select_related('category')
@@ -1619,13 +1623,17 @@ class AdminNotificationsView(BaseAdminRequiredMixin, ListView):
 # ════════════════════════════════════════════════
 
 class AdminCategoriesView(BaseAdminRequiredMixin, ListView):
-    """List all exam categories."""
+    """List all exam categories with the real active-question count."""
     template_name = 'exams/admin/categories.html'
     context_object_name = 'categories'
-    
+
     def get_queryset(self):
         return Category.objects.annotate(
-            q_count=Count('questions')
+            actual_question_count=Count(
+                'questions',
+                filter=Q(questions__is_active=True),
+                distinct=True,
+            )
         ).order_by('name')
 
 
@@ -1764,15 +1772,32 @@ class PreviewCertificateView(View):
             """
             return HttpResponse(html_content)
 
-        from .models import StudentExamResult, Category, ExamPaper, CustomUser
+        from .models import StudentExamResult, Certificate, Category, ExamPaper, CustomUser
+        from django.core.exceptions import PermissionDenied
         import os
         from PIL import Image, ImageDraw, ImageFont
         from django.conf import settings
         from django.utils import timezone
 
-        # Try to get the latest available exam result or create a dummy object
-        result = StudentExamResult.objects.first()
-        if not result:
+        result_id = request.GET.get('result_id')
+        result = None
+        certificate = None
+
+        if result_id:
+            certificate = Certificate.objects.filter(id=result_id).first()
+            if not certificate:
+                result = StudentExamResult.objects.filter(id=result_id).first()
+        
+        # Security checks
+        user = request.user
+        if not user.is_superuser and hasattr(user, 'role') and user.role not in [CustomUser.Role.ADMIN, CustomUser.Role.SUB_ADMIN]:
+            if certificate and certificate.student != user:
+                raise PermissionDenied("You do not have permission to view this certificate.")
+            if result and result.student != user:
+                raise PermissionDenied("You do not have permission to view this certificate.")
+
+        # If no result or certificate found, fallback to mock (only for admin preview purposes)
+        if not result and not certificate:
             class MockCategory:
                 name = "Python Programming"
 
@@ -1795,10 +1820,17 @@ class PreviewCertificateView(View):
 
             result = MockResult()
 
-        student = result.student
-        student_name = f"{student.first_name} {student.last_name}".strip() or student.username
-        course_name = result.exam_paper.category.name if result.exam_paper and result.exam_paper.category else "Aptitude Course"
-        score = float(result.percentage()) if hasattr(result, 'percentage') else 100.0
+        if certificate:
+            student = certificate.student
+            student_name = f"{student.first_name} {student.last_name}".strip() or student.username
+            course_name = certificate.category.name if certificate.category else "Aptitude Course"
+            score = float(certificate.percentage)
+        else:
+            student = result.student
+            student_name = f"{student.first_name} {student.last_name}".strip() or student.username
+            course_name = result.exam_paper.category.name if result.exam_paper and result.exam_paper.category else "Aptitude Course"
+            score = float(result.percentage()) if hasattr(result, 'percentage') else 100.0
+            
         date_str = timezone.now().strftime("%B %Y")
 
         # Create a blank white canvas exactly A4 Landscape size (1414 x 1000)

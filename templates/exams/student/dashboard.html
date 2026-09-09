@@ -7,16 +7,16 @@
 {% block content %}
 <div class="stats-grid">
   <div class="stat-box">
-    <div class="stat-label">📜 Pending Requests</div>
-    <div class="stat-value">{{ pending_requests }}</div>
-  </div>
-  <div class="stat-box">
     <div class="stat-label">✅ Available Exams</div>
-    <div class="stat-value">{{ available_exams.count }}</div>
+    <div class="stat-value">{{ available_exams|length }}</div>
   </div>
   <div class="stat-box">
     <div class="stat-label">📊 Completed Exams</div>
     <div class="stat-value">{{ completed_exams }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">📑 Latest Results</div>
+    <div class="stat-value">{{ latest_results|length }}</div>
   </div>
   <div class="stat-box">
     <div class="stat-label">🔔 Unread Notifications</div>
@@ -24,11 +24,7 @@
   </div>
 </div>
 
-<!-- Deleted Request Exam CTA -->
-
 <div class="grid-2" style="margin-top: 32px;">
-  
-  <!-- Available Exams -->
   <div class="card">
     <div class="card-title">📖 Available Exams</div>
     <div class="table-container">
@@ -42,65 +38,22 @@
           </tr>
         </thead>
         <tbody>
-          {% for paper in available_exams %}
+          {% for category in available_exams %}
             <tr>
-              <td style="font-weight: 700;">{{ paper.category.name }}</td>
-              <td>{{ paper.total_duration_minutes }}m</td>
-              <td>{{ paper.total_marks }}</td>
+              <td style="font-weight: 700;">{{ category.name }}</td>
+              <td>{{ category.total_duration_minutes|default:'0' }}m</td>
+              <td>{{ category.total_marks|default:'0' }}</td>
               <td>
-                <a href="{% url 'take_exam' paper.id %}" class="btn btn-success btn-sm">Start Exam</a>
+                <form method="post" action="{% url 'start_exam' category.id %}">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-success btn-sm">Start Exam</button>
+                </form>
               </td>
             </tr>
           {% empty %}
             <tr>
               <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 32px;">
-                No approved exams ready. Contact your admin or browse categories to request access.
-              </td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  
-  <!-- Recent Requests -->
-  <div class="card">
-    <div class="card-title">⚖️ Recent Requests</div>
-    <div class="table-container">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Category</th>
-            <th>Status</th>
-            <th>Notes / Message</th>
-            <th>Date</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for req in recent_requests %}
-            <tr>
-              <td>{{ req.category.name }}</td>
-              <td>
-                <span class="badge badge-{{ req.status|lower }}">{{ req.status }}</span>
-              </td>
-              <td>
-                {% if req.status == 'Rejected' %}
-                  <span style="color: var(--accent-danger); font-weight: 600;">Better luck next time.</span>
-                  {% if req.rejection_reason %}
-                    <br><small style="color: var(--text-muted);">{{ req.rejection_reason }}</small>
-                  {% endif %}
-                {% elif req.status == 'Approved' %}
-                  <span style="color: var(--accent-secondary);">Proceed to start exam.</span>
-                {% else %}
-                  <span style="color: var(--text-muted);">Waiting for review...</span>
-                {% endif %}
-              </td>
-              <td style="font-size: 12px;">{{ req.requested_at|date:"M d, Y" }}</td>
-            </tr>
-          {% empty %}
-            <tr>
-              <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 32px;">
-                No recent requests found.
+                No exams are currently available. Browse categories to start a new attempt.
               </td>
             </tr>
           {% endfor %}
@@ -109,5 +62,34 @@
     </div>
   </div>
 
+  <div class="card">
+    <div class="card-title">🏆 Latest Results</div>
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Score</th>
+            <th>Status</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for result in latest_results %}
+            <tr>
+              <td>{{ result.exam_paper.category.name }}</td>
+              <td>{{ result.percentage }}%</td>
+              <td><span class="badge {% if result.is_passed %}badge-approved{% else %}badge-rejected{% endif %}">{{ result.is_passed|yesno:'PASS,FAIL' }}</span></td>
+              <td style="font-size: 12px;">{{ result.completed_at|date:"M d, Y" }}</td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 32px;">No results yet.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 {% endblock %}
